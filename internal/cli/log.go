@@ -39,6 +39,10 @@ func runLog(args []string, out, errOut io.Writer) int {
 		fmt.Fprintln(out, "  (none)")
 	}
 	for _, v := range versions {
+		if v.Message == "" {
+			fmt.Fprintf(out, "  v%d  %s  %s\n", v.ID, v.Hash[:8], v.CommittedAt.Format(time.RFC3339))
+			continue
+		}
 		fmt.Fprintf(out, "  v%d  %s  %s  %s\n", v.ID, v.Hash[:8],
 			v.CommittedAt.Format(time.RFC3339), strings.ReplaceAll(v.Message, "\n", " "))
 	}

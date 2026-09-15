@@ -93,12 +93,12 @@ var migrations = []func(tx *sql.Tx) error{
 func (s *DB) migrate() error {
 	if _, err := s.db.Exec(`CREATE TABLE IF NOT EXISTS meta (
 		key TEXT PRIMARY KEY, value TEXT NOT NULL)`); err != nil {
-		return fmt.Errorf("migrate: %w", err)
+		return fmt.Errorf("migrate: %w — if the database file is corrupt, recover .respex/state.db manually; respex never deletes it", err)
 	}
 	var raw sql.NullString
 	err := s.db.QueryRow(`SELECT value FROM meta WHERE key='schema_version'`).Scan(&raw)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return fmt.Errorf("migrate: %w", err)
+		return fmt.Errorf("migrate: %w — if the database file is corrupt, recover .respex/state.db manually; respex never deletes it", err)
 	}
 	current := 0
 	if raw.Valid {

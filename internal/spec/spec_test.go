@@ -49,3 +49,9 @@ func TestReadMissingFails(t *testing.T) {
 		t.Fatal("Read of missing spec should fail")
 	}
 }
+
+func TestSkeletonUnresolvedDecision(t *testing.T) {
+	if !strings.Contains(Skeleton, "- <Unresolved decision.>") {
+		t.Fatalf("Skeleton missing bullet form, got:\n%s", Skeleton)
+	}
+}
