@@ -31,6 +31,7 @@ var commands = map[string]func(args []string, out, errOut io.Writer) int{
 	"commit": runCommit,
 	"diff":   runDiff,
 	"apply":  runApply,
+	"refine": runRefine,
 }
 
 func usage(w io.Writer) {
