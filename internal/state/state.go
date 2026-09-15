@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"net/url"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -38,7 +40,8 @@ type DB struct {
 
 // Open opens (creating if needed) the state database and applies pending migrations.
 func Open(path string) (*DB, error) {
-	d, err := sql.Open("sqlite", "file:"+path+"?_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)")
+	u := url.URL{Scheme: "file", OmitHost: true, Path: filepath.ToSlash(path)}
+	d, err := sql.Open("sqlite", u.String()+"?_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)")
 	if err != nil {
 		return nil, fmt.Errorf("open state %s: %w", path, err)
 	}

@@ -3,6 +3,7 @@ package state
 import (
 	"database/sql"
 	"errors"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -39,6 +40,25 @@ func TestReopenIsIdempotent(t *testing.T) {
 		t.Fatal(err)
 	}
 	d2.Close()
+}
+
+func TestOpenPercentPath(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "dir%20name")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	d, err := Open(filepath.Join(dir, "state.db"))
+	if err != nil {
+		t.Fatalf("Open with %% in path: %v", err)
+	}
+	t.Cleanup(func() { d.Close() })
+	if _, err := d.InsertVersion("h1", []byte("one"), "msg", time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	v, err := d.LatestVersion()
+	if err != nil || v == nil || v.Hash != "h1" || v.Message != "msg" {
+		t.Fatalf("LatestVersion = %+v, %v", v, err)
+	}
 }
 
 func TestVersionCRUD(t *testing.T) {
