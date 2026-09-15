@@ -17,6 +17,7 @@ import (
 
 const configTemplate = `# respex configuration
 # spec = "SPEC.md"
+# Add keys inside the tables below — do not redeclare [agent] or [prompts].
 
 [agent]
 # Required before refine/apply: the agent CLI, as an argv array.
@@ -42,7 +43,7 @@ func runNew(args []string, out, errOut io.Writer) int {
 		desc = args[0]
 	}
 	if _, err := os.Stat(filepath.Join(".respex", "state.db")); err == nil {
-		return fail(errOut, fmt.Errorf("this directory is already a respex project (.respex/state.db exists)"))
+		return fail(errOut, fmt.Errorf("this directory is already a respex project (.respex/state.db exists) — delete .respex/state.db to re-initialize"))
 	}
 	cfg, err := loadConfig(".")
 	if err != nil {
@@ -149,6 +150,12 @@ func ensureGitignore() error {
 		return err
 	}
 	defer f.Close()
-	_, err = f.WriteString("\n.respex/\n")
+	// A leading blank line is needed only to terminate a pre-existing entry
+	// whose last line lacks a newline; a fresh file starts clean.
+	prefix := ""
+	if len(existing) > 0 && existing[len(existing)-1] != '\n' {
+		prefix = "\n"
+	}
+	_, err = f.WriteString(prefix + ".respex/\n")
 	return err
 }
