@@ -2,6 +2,8 @@ package cli
 
 import (
 	"errors"
+	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -27,6 +29,8 @@ func discover() (*workspace, error) {
 	for {
 		if fi, err := os.Stat(filepath.Join(p, ".respex")); err == nil && fi.IsDir() {
 			return loadWorkspace(p)
+		} else if err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return nil, fmt.Errorf("checking %s/.respex: %w", p, err)
 		}
 		parent := filepath.Dir(p)
 		if parent == p {
@@ -44,6 +48,9 @@ func loadWorkspace(root string) (*workspace, error) {
 	return &workspace{root: root, cfg: cfg}, nil
 }
 
+// loadConfig merges the user-level config, then the project config, over
+// defaults. A GlobalPath() error (e.g. HOME unset) silently degrades to
+// project-config-only.
 func loadConfig(root string) (config.Config, error) {
 	global, gerr := config.GlobalPath()
 	if gerr != nil {
@@ -52,6 +59,8 @@ func loadConfig(root string) (config.Config, error) {
 	return config.Load(global, filepath.Join(root, ".respex", "config.toml"))
 }
 
+// specPath joins cfg.Spec under root; cfg.Spec is anchored under root — an
+// absolute path is joined textually per spec §3 root-anchoring.
 func (w *workspace) specPath() string { return filepath.Join(w.root, w.cfg.Spec) }
 
 func (w *workspace) openState() (*state.DB, error) {
@@ -65,6 +74,7 @@ func (w *workspace) adapter() (agent.Adapter, string, error) {
 			"no agent configured — set [agent] command in .respex/config.toml")
 	}
 	delivery := w.cfg.Agent.Delivery
+	// Defensive: Defaults() already sets argv; merge cannot unset it.
 	if delivery == "" {
 		delivery = agent.DeliveryArgv
 	}
