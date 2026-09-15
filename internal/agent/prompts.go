@@ -8,7 +8,7 @@ import "strings"
 const (
 	PromptDraft = `Write a design specification document at {{spec_path}} for the idea below.
 Use exactly these sections: Intent, Scope, Non-Goals, Requirements, Open Questions.
-Write concrete, testable requirements. Do not create any other files.
+Write concrete, testable requirements. Do not create or modify any other files.
 
 Idea: {{prompt}}`
 
@@ -30,7 +30,9 @@ const (
 	PlaceholderSpecPath = "{{spec_path}}"
 )
 
-// Expand substitutes placeholders in a prompt template.
+// Expand substitutes placeholders in a prompt template. Replacement values are
+// not rescanned: Expand performs a single pass, so prompt text that itself
+// mentions template syntax is preserved verbatim.
 func Expand(tmpl, prompt, specPath string) string {
 	return strings.NewReplacer(PlaceholderSpecPath, specPath, PlaceholderPrompt, prompt).Replace(tmpl)
 }
