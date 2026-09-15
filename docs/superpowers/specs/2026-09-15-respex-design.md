@@ -314,7 +314,8 @@ no shell-out plumbing. License: MIT.
 ## 11. Distribution
 
 - GitHub repository `respex`; goreleaser on tag push produces static binaries
-  (`CGO_ENABLED=0`) for all eight targets plus checksums.
+  (`CGO_ENABLED=0`) for all six targets (linux/darwin/windows × amd64/arm64)
+  plus checksums.
 - GitHub Actions: PR workflow (test + build matrix), release workflow (goreleaser).
 - Homebrew tap added post-v1; install script may mirror goreleaser output.
 
