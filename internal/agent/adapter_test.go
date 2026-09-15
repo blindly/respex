@@ -52,6 +52,39 @@ func TestBuildUnknownPlaceholder(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "{{nope}}") {
 		t.Fatalf("err = %v", err)
 	}
+	if err == nil || !strings.Contains(err.Error(), "supported") {
+		t.Fatalf("err must list supported placeholders, got %v", err)
+	}
+}
+
+func TestBuildUnknownDelivery(t *testing.T) {
+	_, _, err := Build([]string{"agent", "{{prompt}}"}, "Argv", "p", "s")
+	if err == nil || !strings.Contains(err.Error(), "unknown delivery") {
+		t.Fatalf("err = %v", err)
+	}
+	if err == nil || !strings.Contains(err.Error(), `want "argv" or "stdin"`) {
+		t.Fatalf("err must name valid deliveries, got %v", err)
+	}
+}
+
+func TestBuildEmptyBinary(t *testing.T) {
+	_, _, err := Build([]string{""}, DeliveryArgv, "p", "s")
+	if err == nil || !strings.Contains(err.Error(), "empty") {
+		t.Fatalf("empty binary must be rejected, got %v", err)
+	}
+}
+
+func TestBuildStdinSpecPath(t *testing.T) {
+	cmd, stdin, err := Build([]string{"agent", "{{spec_path}}"}, DeliveryStdin, "p", "/r/S.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(stdin) != "p" {
+		t.Fatalf("stdin = %q", stdin)
+	}
+	if strings.Join(cmd.Args, " ") != "agent /r/S.md" {
+		t.Fatalf("args = %v", cmd.Args)
+	}
 }
 
 func TestBuildSizeLimit(t *testing.T) {

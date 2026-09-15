@@ -24,7 +24,7 @@ func checkPlaceholders(tpl []string) error {
 	for _, el := range tpl {
 		for _, m := range placeholderRe.FindAllString(el, -1) {
 			if m != PlaceholderPrompt && m != PlaceholderSpecPath {
-				return fmt.Errorf("agent: unknown placeholder %s", m)
+				return fmt.Errorf("agent: unknown placeholder %s; supported: {{prompt}}, {{spec_path}}", m)
 			}
 		}
 	}
@@ -36,6 +36,9 @@ func checkPlaceholders(tpl []string) error {
 func Build(tpl []string, delivery, prompt, specPath string) (*exec.Cmd, []byte, error) {
 	if len(tpl) == 0 {
 		return nil, nil, errors.New("agent: empty command template")
+	}
+	if tpl[0] == "" {
+		return nil, nil, errors.New("agent: command element 0 (binary) is empty — set [agent] command in .respex/config.toml")
 	}
 	if err := checkPlaceholders(tpl); err != nil {
 		return nil, nil, err
@@ -53,7 +56,7 @@ func Build(tpl []string, delivery, prompt, specPath string) (*exec.Cmd, []byte, 
 				`agent: delivery %q forbids {{prompt}} in the command; remove it and pipe instead`, DeliveryStdin)
 		}
 	default:
-		return nil, nil, fmt.Errorf("agent: unknown delivery %q", delivery)
+		return nil, nil, fmt.Errorf("agent: unknown delivery %q; want %q or %q", delivery, DeliveryArgv, DeliveryStdin)
 	}
 	argv := make([]string, len(tpl))
 	total := 0
@@ -61,6 +64,10 @@ func Build(tpl []string, delivery, prompt, specPath string) (*exec.Cmd, []byte, 
 		argv[i] = Expand(el, prompt, specPath)
 		total += len(argv[i]) + 1
 	}
+	// Size guard against the Windows CreateProcess command-line limit. The
+	// count is in bytes, which is conservative versus UTF-16 units (bytes are
+	// never fewer); Windows quoting overhead (syscall.EscapeArg) is not
+	// modeled.
 	if delivery == DeliveryArgv && total > maxArgvBytes {
 		return nil, nil, fmt.Errorf(
 			"agent: command line is %d bytes (limit %d) — set delivery = \"stdin\"", total, maxArgvBytes)
