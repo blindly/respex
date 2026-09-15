@@ -106,8 +106,8 @@ func TestLogAppliesRendering(t *testing.T) {
 		t.Fatalf("log renders raw newline in message:\n%s", s)
 	}
 	ai, vi := strings.Index(s, "applies:"), strings.Index(s, "versions:")
-	if ai < 0 || vi < 0 || ai > vi {
-		t.Fatalf("applies section must precede versions: %d vs %d in:\n%s", ai, vi, s)
+	if ai < 0 || vi < 0 || vi > ai {
+		t.Fatalf("versions section must precede applies: %d vs %d in:\n%s", vi, ai, s)
 	}
 	vrest := s[vi:]
 	if v2i, v1i := strings.Index(vrest, "  v2  "), strings.Index(vrest, "  v1  "); v2i < 0 || v1i < 0 || v2i > v1i {

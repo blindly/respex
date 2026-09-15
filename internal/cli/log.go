@@ -34,6 +34,14 @@ func runLog(args []string, out, errOut io.Writer) int {
 		return fail(errOut, err)
 	}
 
+	fmt.Fprintln(out, "versions:")
+	if len(versions) == 0 {
+		fmt.Fprintln(out, "  (none)")
+	}
+	for _, v := range versions {
+		fmt.Fprintf(out, "  v%d  %s  %s  %s\n", v.ID, v.Hash[:8],
+			v.CommittedAt.Format(time.RFC3339), strings.ReplaceAll(v.Message, "\n", " "))
+	}
 	fmt.Fprintln(out, "applies:")
 	if len(applies) == 0 {
 		fmt.Fprintln(out, "  (none)")
@@ -45,14 +53,6 @@ func runLog(args []string, out, errOut io.Writer) int {
 		}
 		fmt.Fprintf(out, "  #%d  v%d  %s  %s  %s  %s\n", a.ID, a.VersionID, a.Agent,
 			exit, a.StartedAt.Format(time.RFC3339), a.LogPath)
-	}
-	fmt.Fprintln(out, "versions:")
-	if len(versions) == 0 {
-		fmt.Fprintln(out, "  (none)")
-	}
-	for _, v := range versions {
-		fmt.Fprintf(out, "  v%d  %s  %s  %s\n", v.ID, v.Hash[:8],
-			v.CommittedAt.Format(time.RFC3339), strings.ReplaceAll(v.Message, "\n", " "))
 	}
 	return 0
 }
