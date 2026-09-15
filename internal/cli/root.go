@@ -25,8 +25,9 @@ func Main(args []string, stdout, stderr io.Writer) int {
 	return fn(args[1:], stdout, stderr)
 }
 
-// commands is filled in by each command task.
-var commands = map[string]func(args []string, out, errOut io.Writer) int{}
+var commands = map[string]func(args []string, out, errOut io.Writer) int{
+	"new": runNew,
+}
 
 func usage(w io.Writer) {
 	fmt.Fprint(w, `respex — spec-driven agentic development
