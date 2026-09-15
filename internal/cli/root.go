@@ -26,7 +26,8 @@ func Main(args []string, stdout, stderr io.Writer) int {
 }
 
 var commands = map[string]func(args []string, out, errOut io.Writer) int{
-	"new": runNew,
+	"new":    runNew,
+	"commit": runCommit,
 }
 
 func usage(w io.Writer) {
