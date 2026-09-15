@@ -1,9 +1,17 @@
 package agent
 
 import (
+	"bytes"
+	"context"
+	"errors"
+	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestBuildSubstitutesArgv(t *testing.T) {
@@ -96,5 +104,71 @@ func TestBuildSizeLimit(t *testing.T) {
 	// Same prompt through stdin is fine.
 	if _, _, err := Build([]string{"agent"}, DeliveryStdin, big, "s"); err != nil {
 		t.Fatal(err)
+	}
+}
+
+var fakeBin string
+
+func TestMain(m *testing.M) {
+	dir, err := os.MkdirTemp("", "respex-agent-test")
+	if err != nil {
+		panic(err)
+	}
+	fakeBin = filepath.Join(dir, "fakeagent")
+	build := exec.Command("go", "build", "-o", fakeBin, "../../testdata/fakeagent")
+	build.Stdout, build.Stderr = os.Stdout, os.Stderr
+	if err := build.Run(); err != nil {
+		panic(err)
+	}
+	code := m.Run()
+	os.RemoveAll(dir)
+	os.Exit(code)
+}
+
+func TestExecuteSuccessTeesOutput(t *testing.T) {
+	dir := t.TempDir()
+	marker := filepath.Join(dir, "marker")
+	log := &bytes.Buffer{}
+	a := Adapter{
+		Command:  []string{fakeBin, "-marker", marker, "{{prompt}}"},
+		Delivery: DeliveryArgv,
+		Dir:      dir,
+	}
+	code, err := a.Execute(context.Background(), "hello agent", "s", log)
+	if err != nil || code != 0 {
+		t.Fatalf("Execute = %d, %v", code, err)
+	}
+	got, _ := os.ReadFile(marker)
+	if !strings.Contains(string(got), "hello agent") {
+		t.Fatalf("marker = %q", got)
+	}
+	if !strings.Contains(log.String(), "hello agent") {
+		t.Fatalf("tee log missing prompt: %q", log.String())
+	}
+}
+
+func TestExecuteFailureExitCode(t *testing.T) {
+	a := Adapter{Command: []string{fakeBin, "-fail", "{{prompt}}"}, Delivery: DeliveryArgv, Dir: t.TempDir()}
+	code, err := a.Execute(context.Background(), "p", "s", io.Discard)
+	if err != nil || code != 1 {
+		t.Fatalf("Execute = %d, %v; want 1, nil", code, err)
+	}
+}
+
+func TestExecuteMissingBinary(t *testing.T) {
+	a := Adapter{Command: []string{"respex-no-such-binary-xyz", "{{prompt}}"}, Delivery: DeliveryArgv, Dir: t.TempDir()}
+	code, err := a.Execute(context.Background(), "p", "s", io.Discard)
+	if err == nil || code != -1 {
+		t.Fatalf("Execute = %d, %v; want -1, error", code, err)
+	}
+}
+
+func TestExecuteInterrupt(t *testing.T) {
+	a := Adapter{Command: []string{fakeBin, "-sleep", "3s", "{{prompt}}"}, Delivery: DeliveryArgv, Dir: t.TempDir()}
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() { time.Sleep(100 * time.Millisecond); cancel() }()
+	code, err := a.Execute(ctx, "p", "s", io.Discard)
+	if !errors.Is(err, context.Canceled) || code != -1 {
+		t.Fatalf("Execute = %d, %v; want -1, context.Canceled", code, err)
 	}
 }

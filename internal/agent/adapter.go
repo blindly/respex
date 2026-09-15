@@ -1,8 +1,12 @@
 package agent
 
 import (
+	"bytes"
+	"context"
 	"errors"
 	"fmt"
+	"io"
+	"os"
 	"os/exec"
 	"regexp"
 	"strings"
@@ -77,4 +81,49 @@ func Build(tpl []string, delivery, prompt, specPath string) (*exec.Cmd, []byte, 
 		stdin = []byte(prompt)
 	}
 	return exec.Command(argv[0], argv[1:]...), stdin, nil
+}
+
+// Adapter is a resolved agent command: argv template + delivery mode + extras.
+type Adapter struct {
+	Command  []string
+	Delivery string
+	Env      []string
+	Dir      string
+}
+
+// Execute runs the adapter with the given instruction text. Agent stdout and
+// stderr tee to the terminal and to out. Returns the exit code; a canceled
+// context returns (-1, context.Canceled).
+func (a Adapter) Execute(ctx context.Context, prompt, specPath string, out io.Writer) (int, error) {
+	cmd, stdin, err := Build(a.Command, a.Delivery, prompt, specPath)
+	if err != nil {
+		return -1, err
+	}
+	cmd.Dir = a.Dir
+	cmd.Env = append(os.Environ(), a.Env...)
+	if stdin != nil {
+		cmd.Stdin = bytes.NewReader(stdin)
+	}
+	cmd.Stdout = io.MultiWriter(os.Stdout, out)
+	cmd.Stderr = io.MultiWriter(os.Stderr, out)
+	if err := cmd.Start(); err != nil {
+		return -1, fmt.Errorf("agent: %w", err)
+	}
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
+	select {
+	case err := <-done:
+		if err == nil {
+			return 0, nil
+		}
+		var ee *exec.ExitError
+		if errors.As(err, &ee) {
+			return ee.ExitCode(), nil
+		}
+		return -1, fmt.Errorf("agent: %w", err)
+	case <-ctx.Done():
+		_ = cmd.Process.Kill()
+		<-done
+		return -1, ctx.Err()
+	}
 }
