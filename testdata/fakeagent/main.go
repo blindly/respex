@@ -23,6 +23,9 @@ func main() {
 		prompt = []byte(flag.Arg(0))
 	}
 	fmt.Print(string(prompt))
+	if *sleep > 0 {
+		time.Sleep(*sleep)
+	}
 	if *marker != "" {
 		f, err := os.OpenFile(*marker, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 		if err != nil {
@@ -35,9 +38,6 @@ func main() {
 		if err := os.WriteFile(*write, []byte(*content), 0o644); err != nil {
 			os.Exit(2)
 		}
-	}
-	if *sleep > 0 {
-		time.Sleep(*sleep)
 	}
 	if *fail {
 		os.Exit(1)

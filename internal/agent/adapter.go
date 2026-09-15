@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
+	"time"
 )
 
 const (
@@ -92,8 +93,13 @@ type Adapter struct {
 }
 
 // Execute runs the adapter with the given instruction text. Agent stdout and
-// stderr tee to the terminal and to out. Returns the exit code; a canceled
-// context returns (-1, context.Canceled).
+// stderr tee to the terminal and to out, which must be safe for concurrent
+// use (the stdout and stderr copiers both write it). Returns the exit code; a
+// canceled context returns (-1, context.Canceled). Cancel kills the direct
+// child only — on Unix descendants of the agent may outlive it (tree-kill via
+// process group is left to callers), and on Windows killing is
+// direct-child-only by design. WaitDelay bounds the wait so orphaned
+// descendants holding the output pipes cannot hang Wait forever.
 func (a Adapter) Execute(ctx context.Context, prompt, specPath string, out io.Writer) (int, error) {
 	cmd, stdin, err := Build(a.Command, a.Delivery, prompt, specPath)
 	if err != nil {
@@ -101,6 +107,7 @@ func (a Adapter) Execute(ctx context.Context, prompt, specPath string, out io.Wr
 	}
 	cmd.Dir = a.Dir
 	cmd.Env = append(os.Environ(), a.Env...)
+	cmd.WaitDelay = 5 * time.Second
 	if stdin != nil {
 		cmd.Stdin = bytes.NewReader(stdin)
 	}
@@ -115,6 +122,9 @@ func (a Adapter) Execute(ctx context.Context, prompt, specPath string, out io.Wr
 	case err := <-done:
 		if err == nil {
 			return 0, nil
+		}
+		if errors.Is(err, exec.ErrWaitDelay) {
+			return cmd.ProcessState.ExitCode(), nil
 		}
 		var ee *exec.ExitError
 		if errors.As(err, &ee) {

@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -115,6 +116,9 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 	fakeBin = filepath.Join(dir, "fakeagent")
+	if runtime.GOOS == "windows" {
+		fakeBin += ".exe"
+	}
 	build := exec.Command("go", "build", "-o", fakeBin, "../../testdata/fakeagent")
 	build.Stdout, build.Stderr = os.Stdout, os.Stderr
 	if err := build.Run(); err != nil {
@@ -164,11 +168,16 @@ func TestExecuteMissingBinary(t *testing.T) {
 }
 
 func TestExecuteInterrupt(t *testing.T) {
-	a := Adapter{Command: []string{fakeBin, "-sleep", "3s", "{{prompt}}"}, Delivery: DeliveryArgv, Dir: t.TempDir()}
+	dir := t.TempDir()
+	wrote := filepath.Join(dir, "after-kill")
+	a := Adapter{Command: []string{fakeBin, "-sleep", "3s", "-write", wrote, "{{prompt}}"}, Delivery: DeliveryArgv, Dir: dir}
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() { time.Sleep(100 * time.Millisecond); cancel() }()
 	code, err := a.Execute(ctx, "p", "s", io.Discard)
 	if !errors.Is(err, context.Canceled) || code != -1 {
 		t.Fatalf("Execute = %d, %v; want -1, context.Canceled", code, err)
+	}
+	if _, err := os.Stat(wrote); !os.IsNotExist(err) {
+		t.Fatalf("killed agent must not have written %s", wrote)
 	}
 }
