@@ -3,6 +3,7 @@ package spec
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -20,6 +21,26 @@ func TestReadEmptyFails(t *testing.T) {
 	}
 	if _, err := Read(p); err == nil {
 		t.Fatal("Read of empty spec should fail")
+	} else if msg := err.Error(); !strings.Contains(msg, "empty") {
+		t.Fatalf("empty-spec error message %q should mention empty", msg)
+	}
+}
+
+func TestReadRoundTrip(t *testing.T) {
+	want := "# Demo\n\n## Intent\n\nDo the thing.\n"
+	p := filepath.Join(t.TempDir(), "SPEC.md")
+	if err := os.WriteFile(p, []byte(want), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Read(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != want {
+		t.Fatalf("Read mutated contents: got %q, want %q", got, want)
+	}
+	if Hash(got) != Hash([]byte(want)) {
+		t.Fatalf("Hash(Read) = %s, want Hash of original %s", Hash(got), Hash([]byte(want)))
 	}
 }
 

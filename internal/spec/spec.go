@@ -1,3 +1,4 @@
+// Package spec reads and fingerprints respex spec files.
 package spec
 
 import (
