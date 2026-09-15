@@ -149,3 +149,49 @@ func TestMigrateRollback(t *testing.T) {
 		t.Fatal("failed migration's table should be rolled back")
 	}
 }
+
+func TestApplyLifecycle(t *testing.T) {
+	d := open(t)
+	now := time.Now()
+	vid, _ := d.InsertVersion("h1", []byte("one"), "", now)
+
+	id, err := d.InsertApply(vid, "fakeagent", now)
+	if err != nil || id != 1 {
+		t.Fatalf("InsertApply = %d, %v", id, err)
+	}
+	if unfinished, err := d.HasUnfinishedApply(); err != nil || !unfinished {
+		t.Fatalf("HasUnfinishedApply = %v, %v; want true", unfinished, err)
+	}
+	if applied, err := d.IsApplied(vid); err != nil || applied {
+		t.Fatalf("IsApplied before finish = %v, %v; want false", applied, err)
+	}
+	if err := d.SetApplyLogPath(id, ".respex/logs/1-apply.log"); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.FinishApply(id, 0, now.Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if applied, err := d.IsApplied(vid); err != nil || !applied {
+		t.Fatalf("IsApplied after exit 0 = %v, %v; want true", applied, err)
+	}
+	if unfinished, _ := d.HasUnfinishedApply(); unfinished {
+		t.Fatal("no unfinished applies should remain")
+	}
+	a, err := d.ListApplies()
+	if err != nil || len(a) != 1 || a[0].ID != 1 || a[0].LogPath != ".respex/logs/1-apply.log" {
+		t.Fatalf("ListApplies = %+v, %v", a, err)
+	}
+	if a[0].ExitCode == nil || *a[0].ExitCode != 0 || a[0].FinishedAt == nil {
+		t.Fatalf("apply row incomplete: %+v", a[0])
+	}
+}
+
+func TestFailedApplyDoesNotCount(t *testing.T) {
+	d := open(t)
+	vid, _ := d.InsertVersion("h1", []byte("one"), "", time.Now())
+	id, _ := d.InsertApply(vid, "fakeagent", time.Now())
+	d.FinishApply(id, 1, time.Now())
+	if applied, _ := d.IsApplied(vid); applied {
+		t.Fatal("failed apply must not count as applied")
+	}
+}

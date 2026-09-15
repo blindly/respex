@@ -221,3 +221,102 @@ func (s *DB) ListVersions() ([]SpecVersion, error) {
 	}
 	return out, nil
 }
+
+// InsertApply records the start of an apply run; log_path starts empty and is
+// filled by SetApplyLogPath once the row id has named the file.
+func (s *DB) InsertApply(versionID int64, agent string, now time.Time) (int64, error) {
+	res, err := s.db.Exec(`INSERT INTO applies
+		(version_id, agent, started_at, finished_at, exit_code, log_path)
+		VALUES (?, ?, ?, NULL, NULL, '')`, versionID, agent, now.UTC().Format(time.RFC3339))
+	if err != nil {
+		return 0, fmt.Errorf("insert apply: %w", err)
+	}
+	return res.LastInsertId()
+}
+
+// SetApplyLogPath records the (repo-relative) log path for an apply row.
+func (s *DB) SetApplyLogPath(id int64, logPath string) error {
+	_, err := s.db.Exec(`UPDATE applies SET log_path = ? WHERE id = ?`, logPath, id)
+	if err != nil {
+		return fmt.Errorf("set apply log path: %w", err)
+	}
+	return nil
+}
+
+// FinishApply stamps the outcome of an apply run.
+func (s *DB) FinishApply(id int64, exitCode int, now time.Time) error {
+	_, err := s.db.Exec(`UPDATE applies SET finished_at = ?, exit_code = ? WHERE id = ?`,
+		now.UTC().Format(time.RFC3339), exitCode, id)
+	if err != nil {
+		return fmt.Errorf("finish apply: %w", err)
+	}
+	return nil
+}
+
+func scanApply(row scanner) (*Apply, error) {
+	var a Apply
+	var started, finished string
+	var exit sql.NullInt64
+	if err := row.Scan(&a.ID, &a.VersionID, &a.Agent, &started, &finished, &exit, &a.LogPath); err != nil {
+		return nil, err
+	}
+	at, err := parseRFC3339(started)
+	if err != nil {
+		return nil, fmt.Errorf("applies.started_at: %w", err)
+	}
+	a.StartedAt = at
+	if finished != "" {
+		ft, err := parseRFC3339(finished)
+		if err != nil {
+			return nil, fmt.Errorf("applies.finished_at: %w", err)
+		}
+		a.FinishedAt = &ft
+	}
+	if exit.Valid {
+		c := int(exit.Int64)
+		a.ExitCode = &c
+	}
+	return &a, nil
+}
+
+// IsApplied reports whether versionID has an apply row with exit_code = 0.
+func (s *DB) IsApplied(versionID int64) (bool, error) {
+	var exists bool
+	if err := s.db.QueryRow(`SELECT EXISTS(
+		SELECT 1 FROM applies WHERE version_id = ? AND exit_code = 0)`, versionID).Scan(&exists); err != nil {
+		return false, fmt.Errorf("is applied: %w", err)
+	}
+	return exists, nil
+}
+
+// HasUnfinishedApply reports whether any apply row lacks an outcome.
+func (s *DB) HasUnfinishedApply() (bool, error) {
+	var exists bool
+	if err := s.db.QueryRow(`SELECT EXISTS(
+		SELECT 1 FROM applies WHERE finished_at IS NULL)`).Scan(&exists); err != nil {
+		return false, fmt.Errorf("unfinished apply: %w", err)
+	}
+	return exists, nil
+}
+
+// ListApplies returns all apply rows, newest first.
+func (s *DB) ListApplies() ([]Apply, error) {
+	rows, err := s.db.Query(`SELECT id, version_id, agent, started_at, finished_at, exit_code, log_path
+		FROM applies ORDER BY id DESC`)
+	if err != nil {
+		return nil, fmt.Errorf("list applies: %w", err)
+	}
+	defer rows.Close()
+	var out []Apply
+	for rows.Next() {
+		a, err := scanApply(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, *a)
+	}
+	if rErr := rows.Err(); rErr != nil {
+		return nil, fmt.Errorf("list applies: %w", rErr)
+	}
+	return out, nil
+}
