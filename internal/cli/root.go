@@ -3,31 +3,30 @@ package cli
 import (
 	"fmt"
 	"io"
-	"os"
 )
 
-const version = "0.1.0"
+var version = "0.1.0"
 
-func Main(args []string) int {
+func Main(args []string, stdout, stderr io.Writer) int {
 	if len(args) > 0 && (args[0] == "--version" || args[0] == "version") {
-		fmt.Println("respex " + version)
+		fmt.Fprintln(stdout, "respex "+version)
 		return 0
 	}
 	if len(args) == 0 || args[0] == "--help" || args[0] == "-h" || args[0] == "help" {
-		usage(os.Stdout)
+		usage(stdout)
 		return 0
 	}
 	fn, ok := commands[args[0]]
 	if !ok {
-		fmt.Fprintf(os.Stderr, "respex: unknown command %q\n\n", args[0])
-		usage(os.Stderr)
+		fmt.Fprintf(stderr, "respex: unknown command %q\n\n", args[0])
+		usage(stderr)
 		return 1
 	}
-	return fn(args[1:], os.Stdout)
+	return fn(args[1:], stdout, stderr)
 }
 
 // commands is filled in by each command task.
-var commands = map[string]func(args []string, out io.Writer) int{}
+var commands = map[string]func(args []string, out, errOut io.Writer) int{}
 
 func usage(w io.Writer) {
 	fmt.Fprint(w, `respex — spec-driven agentic development
@@ -46,8 +45,8 @@ Commands:
 `)
 }
 
-// fail prints an error to stderr and returns exit code 1.
-func fail(err error) int {
-	fmt.Fprintln(os.Stderr, "respex: "+err.Error())
+// fail prints an error to the given writer and returns exit code 1.
+func fail(w io.Writer, err error) int {
+	fmt.Fprintln(w, "respex: "+err.Error())
 	return 1
 }

@@ -1,3 +1,3 @@
 module respex
 
-go 1.26.1
+go 1.24
