@@ -103,12 +103,12 @@ func draftSpec(cfg config.Config, desc, specRel string, out, errOut io.Writer) i
 	if err := os.MkdirAll(logsDir, 0o755); err != nil {
 		return fail(errOut, err)
 	}
-	logPath := filepath.Join(logsDir, time.Now().UTC().Format("20060102T150405Z")+"-draft.log")
-	f, err := os.Create(logPath)
+	f, err := os.CreateTemp(logsDir, time.Now().UTC().Format("20060102T150405Z")+"-draft-*.log")
 	if err != nil {
 		return fail(errOut, err)
 	}
 	defer f.Close()
+	logPath := f.Name()
 	abs, err := filepath.Abs(specRel)
 	if err != nil {
 		return fail(errOut, err)

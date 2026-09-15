@@ -36,12 +36,12 @@ func runRefine(args []string, out, errOut io.Writer) int {
 	if err := os.MkdirAll(logsDir, 0o755); err != nil {
 		return fail(errOut, err)
 	}
-	logPath := filepath.Join(logsDir, time.Now().UTC().Format("20060102T150405Z")+"-refine.log")
-	f, err := os.Create(logPath)
+	f, err := os.CreateTemp(logsDir, time.Now().UTC().Format("20060102T150405Z")+"-refine-*.log")
 	if err != nil {
 		return fail(errOut, err)
 	}
 	defer f.Close()
+	logPath := f.Name()
 
 	tmpl := agent.PromptRefine
 	if w.cfg.Prompts.Refine != "" {
