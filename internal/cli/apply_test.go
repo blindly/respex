@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -90,6 +91,9 @@ func TestApplyMissingBinary(t *testing.T) {
 
 func TestApplyLogSetupFailureStampsRow(t *testing.T) {
 	root := setupProject(t)
+	if runtime.GOOS == "windows" {
+		t.Skip("directory permissions are not enforced on windows")
+	}
 	writeSpec(t, root, "# one\n")
 	writeConfig(t, root, "[agent]\ncommand = [\"respex-no-such-binary-xyz\", \"{{prompt}}\"]\n")
 	runCommit(nil, &bytes.Buffer{}, &bytes.Buffer{})
