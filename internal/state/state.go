@@ -255,7 +255,8 @@ func (s *DB) FinishApply(id int64, exitCode int, now time.Time) error {
 
 func scanApply(row scanner) (*Apply, error) {
 	var a Apply
-	var started, finished string
+	var started string
+	var finished sql.NullString
 	var exit sql.NullInt64
 	if err := row.Scan(&a.ID, &a.VersionID, &a.Agent, &started, &finished, &exit, &a.LogPath); err != nil {
 		return nil, err
@@ -265,8 +266,8 @@ func scanApply(row scanner) (*Apply, error) {
 		return nil, fmt.Errorf("applies.started_at: %w", err)
 	}
 	a.StartedAt = at
-	if finished != "" {
-		ft, err := parseRFC3339(finished)
+	if finished.Valid {
+		ft, err := parseRFC3339(finished.String)
 		if err != nil {
 			return nil, fmt.Errorf("applies.finished_at: %w", err)
 		}
@@ -311,7 +312,7 @@ func (s *DB) ListApplies() ([]Apply, error) {
 	for rows.Next() {
 		a, err := scanApply(rows)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("list applies: scan apply: %w", err)
 		}
 		out = append(out, *a)
 	}

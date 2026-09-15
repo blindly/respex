@@ -195,3 +195,21 @@ func TestFailedApplyDoesNotCount(t *testing.T) {
 		t.Fatal("failed apply must not count as applied")
 	}
 }
+
+func TestListAppliesReadsInterruptedRow(t *testing.T) {
+	d := open(t)
+	vid, _ := d.InsertVersion("h1", []byte("one"), "", time.Now())
+	if _, err := d.InsertApply(vid, "fakeagent", time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	a, err := d.ListApplies()
+	if err != nil {
+		t.Fatalf("ListApplies on interrupted row: %v", err)
+	}
+	if len(a) != 1 {
+		t.Fatalf("len(ListApplies) = %d, want 1", len(a))
+	}
+	if a[0].FinishedAt != nil || a[0].ExitCode != nil || a[0].LogPath != "" {
+		t.Fatalf("interrupted row = %+v; want nil FinishedAt, nil ExitCode, empty LogPath", a[0])
+	}
+}
