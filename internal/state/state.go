@@ -38,11 +38,15 @@ type DB struct {
 
 // Open opens (creating if needed) the state database and applies pending migrations.
 func Open(path string) (*DB, error) {
-	d, err := sql.Open("sqlite", path)
+	d, err := sql.Open("sqlite", "file:"+path+"?_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)")
 	if err != nil {
 		return nil, fmt.Errorf("open state %s: %w", path, err)
 	}
 	d.SetMaxOpenConns(1) // sqlite: serialize internal access
+	if err := d.Ping(); err != nil {
+		d.Close()
+		return nil, fmt.Errorf("open state %s: %w", path, err)
+	}
 	s := &DB{db: d}
 	if err := s.migrate(); err != nil {
 		d.Close()
@@ -95,7 +99,8 @@ func (s *DB) migrate() error {
 	}
 	current := 0
 	if raw.Valid {
-		if _, scanErr := fmt.Sscanf(raw.String, "%d", &current); scanErr != nil {
+		var scanErr error
+		if current, scanErr = strconv.Atoi(raw.String); scanErr != nil || current < 0 {
 			return fmt.Errorf("migrate: corrupt schema_version %q", raw.String)
 		}
 	}
@@ -176,7 +181,7 @@ func (s *DB) LatestVersion() (*SpecVersion, error) {
 		return nil, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("latest version: %w", err)
+		return nil, fmt.Errorf("latest version: scan version: %w", err)
 	}
 	return v, nil
 }
@@ -190,7 +195,7 @@ func (s *DB) GetVersion(id int64) (*SpecVersion, error) {
 		return nil, fmt.Errorf("no such version v%d", id)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("get version %d: %w", id, err)
+		return nil, fmt.Errorf("get version %d: scan version: %w", id, err)
 	}
 	return v, nil
 }
@@ -207,9 +212,12 @@ func (s *DB) ListVersions() ([]SpecVersion, error) {
 	for rows.Next() {
 		v, err := scanVersion(rows)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("list versions: scan version: %w", err)
 		}
 		out = append(out, *v)
 	}
-	return out, rows.Err()
+	if rErr := rows.Err(); rErr != nil {
+		return nil, fmt.Errorf("list versions: %w", rErr)
+	}
+	return out, nil
 }
