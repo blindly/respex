@@ -3,6 +3,8 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -53,7 +55,7 @@ command = ["gemini", "-p", "{{prompt}}"]
 	}
 }
 
-func TestPromptsMergeKeyBykey(t *testing.T) {
+func TestPromptsMergeKeyByKey(t *testing.T) {
 	dir := t.TempDir()
 	g := filepath.Join(dir, "global.toml")
 	p := filepath.Join(dir, "project.toml")
@@ -79,5 +81,42 @@ func TestInvalidTOMLIsAnError(t *testing.T) {
 	write(t, p, "spec = ")
 	if _, err := Load("", p); err == nil {
 		t.Fatal("parse error should surface")
+	}
+}
+
+func TestProjectWinsTopLevel(t *testing.T) {
+	dir := t.TempDir()
+	g := filepath.Join(dir, "global.toml")
+	p := filepath.Join(dir, "project.toml")
+	write(t, g, `spec = "GLOBAL.md"`)
+	write(t, p, `spec = "PROJECT.md"`)
+	cfg, err := Load(g, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Spec != "PROJECT.md" {
+		t.Fatalf("spec = %q, want PROJECT.md", cfg.Spec)
+	}
+}
+
+func TestReadErrorSurfaces(t *testing.T) {
+	dir := t.TempDir()
+	if _, err := Load(dir, ""); err == nil || !strings.Contains(err.Error(), "read config") {
+		t.Fatalf("want read config error, got %v", err)
+	}
+}
+
+func TestGlobalPath(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("XDG_CONFIG_HOME is not honored on Windows")
+	}
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	got, err := GlobalPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := filepath.Join(dir, "respex", "config.toml"); got != want {
+		t.Fatalf("GlobalPath() = %q, want %q", got, want)
 	}
 }
