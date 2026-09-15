@@ -9,25 +9,35 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 )
 
 var respexBin, fakeBin string
 
 func TestMain(m *testing.M) {
+	if _, err := exec.LookPath("go"); err != nil {
+		fmt.Fprintln(os.Stderr, "integration tests need the go toolchain on PATH:", err)
+		os.Exit(1)
+	}
 	dir, err := os.MkdirTemp("", "respex-integration")
 	if err != nil {
 		panic(err)
 	}
+	// os.Exit below skips defers; the explicit RemoveAll covers the normal
+	// path and the defer covers a build panic unwinding the stack.
+	defer os.RemoveAll(dir)
 	respexBin = filepath.Join(dir, "respex")
 	fakeBin = filepath.Join(dir, "fakeagent")
 	if runtime.GOOS == "windows" {
 		respexBin += ".exe"
 		fakeBin += ".exe"
 	}
-	if err := exec.Command("go", "build", "-o", respexBin, ".").Run(); err != nil {
+	if out, err := exec.Command("go", "build", "-o", respexBin, ".").CombinedOutput(); err != nil {
+		fmt.Fprintf(os.Stderr, "building respex failed:\n%s\n", out)
 		panic(err)
 	}
-	if err := exec.Command("go", "build", "-o", fakeBin, "./testdata/fakeagent").Run(); err != nil {
+	if out, err := exec.Command("go", "build", "-o", fakeBin, "./testdata/fakeagent").CombinedOutput(); err != nil {
+		fmt.Fprintf(os.Stderr, "building fakeagent failed:\n%s\n", out)
 		panic(err)
 	}
 	code := m.Run()
@@ -97,37 +107,55 @@ func TestLifecycleEndToEnd(t *testing.T) {
 		t.Fatalf("no-op apply: %d, %s", code, out)
 	}
 
-	// Dirty spec guard.
-	write(t, filepath.Join(root, "SPEC.md"), "# Demo\n\n## Intent\n\nDo the thing better.\n")
-	out, code = run(t, root, "apply")
-	if code != 1 || !strings.Contains(out, "spec changed since last commit") {
-		t.Fatalf("dirty guard: %d, %s", code, out)
+	// Refine round-trip: the agent rewrites the spec, which is then
+	// committed and applied as v2.
+	write(t, filepath.Join(root, ".respex", "config.toml"),
+		fmt.Sprintf("[agent]\ncommand = [%q, \"-write\", %q, \"-content\", \"# Demo\\n\\n## Intent\\n\\nRefined by agent.\\n\", \"-marker\", %q, \"{{prompt}}\"]\n",
+			fakeBin, filepath.Join(root, "SPEC.md"), filepath.Join(root, "marker")))
+	out, code = run(t, root, "refine")
+	if code != 0 || !strings.Contains(out, "spec updated") {
+		t.Fatalf("refine: %d, %s", code, out)
 	}
-
-	// Commit v2 and re-apply: the new version applies.
-	out, code = run(t, root, "commit", "-m", "second")
+	refined, _ := os.ReadFile(filepath.Join(root, "SPEC.md"))
+	if !strings.Contains(string(refined), "Refined by agent.") {
+		t.Fatalf("refined spec: %q", refined)
+	}
+	out, code = run(t, root, "commit", "-m", "refined")
 	if code != 0 || !strings.Contains(out, "committed v2") {
-		t.Fatalf("commit2: %d, %s", code, out)
+		t.Fatalf("commit refined: %d, %s", code, out)
 	}
 	out, code = run(t, root, "apply")
 	if code != 0 || !strings.Contains(out, "applied v2") {
 		t.Fatalf("apply v2: %d, %s", code, out)
 	}
 	marker2, _ := os.ReadFile(filepath.Join(root, "marker"))
-	if strings.Count(string(marker2), "\n---\n") != 2 {
-		t.Fatalf("agent should have run twice, marker:\n%s", marker2)
+	if strings.Count(string(marker2), "\n---\n") != 3 {
+		t.Fatalf("agent should have run three times (apply, refine, apply), marker:\n%s", marker2)
+	}
+
+	// Dirty spec guard.
+	write(t, filepath.Join(root, "SPEC.md"), "# Demo\n\n## Intent\n\nDo the thing better.\n")
+	out, code = run(t, root, "apply")
+	if code != 1 || !strings.Contains(out, "spec changed since last commit") {
+		t.Fatalf("dirty guard: %d, %s", code, out)
 	}
 }
 
 func TestApplyFailureThenRetry(t *testing.T) {
 	root := isolate(t)
-	run(t, root, "new")
+	out, code := run(t, root, "new")
+	if code != 0 {
+		t.Fatalf("new: %d, %s", code, out)
+	}
 	write(t, filepath.Join(root, "SPEC.md"), "# x\n")
 	write(t, filepath.Join(root, ".respex", "config.toml"),
 		fmt.Sprintf("[agent]\ncommand = [%q, \"-fail\", \"{{prompt}}\"]\n", fakeBin))
-	run(t, root, "commit")
+	out, code = run(t, root, "commit")
+	if code != 0 {
+		t.Fatalf("commit: %d, %s", code, out)
+	}
 
-	out, code := run(t, root, "apply")
+	out, code = run(t, root, "apply")
 	if code != 1 || !strings.Contains(out, "failed (exit 1)") {
 		t.Fatalf("failing apply: %d, %s", code, out)
 	}
@@ -143,13 +171,19 @@ func TestApplyFailureThenRetry(t *testing.T) {
 
 func TestStdinDelivery(t *testing.T) {
 	root := isolate(t)
-	run(t, root, "new")
+	out, code := run(t, root, "new")
+	if code != 0 {
+		t.Fatalf("new: %d, %s", code, out)
+	}
 	write(t, filepath.Join(root, "SPEC.md"), "# x\n")
 	marker := filepath.Join(root, "marker")
 	write(t, filepath.Join(root, ".respex", "config.toml"),
 		fmt.Sprintf("[agent]\ncommand = [%q, \"-marker\", %q]\ndelivery = \"stdin\"\n", fakeBin, marker))
-	run(t, root, "commit")
-	out, code := run(t, root, "apply")
+	out, code = run(t, root, "commit")
+	if code != 0 {
+		t.Fatalf("commit: %d, %s", code, out)
+	}
+	out, code = run(t, root, "apply")
 	if code != 0 || !strings.Contains(out, "applied v1") {
 		t.Fatalf("stdin apply: %d, %s", code, out)
 	}
@@ -175,5 +209,68 @@ func TestNewDraftViaAgent(t *testing.T) {
 	body, _ := os.ReadFile(filepath.Join(root, "SPEC.md"))
 	if string(body) != "drafted spec" {
 		t.Fatalf("SPEC.md = %q", body)
+	}
+}
+
+func TestApplyInterrupt(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("SIGINT delivery is not exercised on windows")
+	}
+	root := isolate(t)
+	out, code := run(t, root, "new")
+	if code != 0 {
+		t.Fatalf("new: %d, %s", code, out)
+	}
+	write(t, filepath.Join(root, "SPEC.md"), "# x\n")
+	write(t, filepath.Join(root, ".respex", "config.toml"),
+		fmt.Sprintf("[agent]\ncommand = [%q, \"-sleep\", \"5s\", \"{{prompt}}\"]\n", fakeBin))
+	out, code = run(t, root, "commit")
+	if code != 0 {
+		t.Fatalf("commit: %d, %s", code, out)
+	}
+
+	// Start apply, then interrupt it mid-run. Wait until the agent has
+	// actually begun (its prompt shows up in the apply log), which also
+	// guarantees respex has registered its SIGINT handler — a blind sleep
+	// can starve under load and kill respex before the handler exists.
+	var buf bytes.Buffer
+	cmd := exec.Command(respexBin, "apply")
+	cmd.Dir = root
+	cmd.Stdout, cmd.Stderr = &buf, &buf
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	logPath := filepath.Join(root, ".respex", "logs", "1-apply.log")
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		if fi, err := os.Stat(logPath); err == nil && fi.Size() > 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			cmd.Process.Kill()
+			_ = cmd.Wait()
+			t.Fatalf("apply never reached the agent; output:\n%s", buf.String())
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if err := cmd.Process.Signal(os.Interrupt); err != nil {
+		cmd.Process.Kill()
+		t.Fatal(err)
+	}
+	_ = cmd.Wait()
+	code = cmd.ProcessState.ExitCode()
+	if code != 1 && code != 130 {
+		t.Fatalf("interrupted apply exit: %d, %s", code, buf.String())
+	}
+	if !strings.Contains(buf.String(), "apply interrupted") {
+		t.Fatalf("interrupted apply output:\n%s", buf.String())
+	}
+
+	// The interrupted row stays unfinished: the re-run warns but proceeds.
+	write(t, filepath.Join(root, ".respex", "config.toml"),
+		fmt.Sprintf("[agent]\ncommand = [%q, \"{{prompt}}\"]\n", fakeBin))
+	out, code = run(t, root, "apply")
+	if code != 0 || !strings.Contains(out, "warning: a previous apply did not finish") || !strings.Contains(out, "applied v1") {
+		t.Fatalf("apply after interrupt: %d, %s", code, out)
 	}
 }

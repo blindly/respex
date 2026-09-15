@@ -2,11 +2,13 @@ package cli
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"respex/internal/state"
 )
@@ -120,5 +122,51 @@ func TestApplyLogSetupFailureStampsRow(t *testing.T) {
 	}
 	if unfinished {
 		t.Fatal("apply row left unfinished after log setup failure")
+	}
+}
+
+func TestApplyWarnsOnUnfinishedRow(t *testing.T) {
+	root := setupProject(t)
+	writeSpec(t, root, "# one\n")
+	writeConfig(t, root, fmt.Sprintf("[agent]\ncommand = [%q, \"{{prompt}}\"]\n", fakeBin))
+	runCommit(nil, &bytes.Buffer{}, &bytes.Buffer{})
+	st, err := state.Open(filepath.Join(root, ".respex", "state.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Seed an interrupted-style row: started, never finished.
+	if _, err := st.InsertApply(1, "fakeagent", time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	st.Close()
+
+	var out, errOut bytes.Buffer
+	if code := runApply(nil, &out, &errOut); code != 0 ||
+		!strings.Contains(out.String(), "warning: a previous apply did not finish") ||
+		!strings.Contains(out.String(), "applied v1") {
+		t.Fatalf("apply with unfinished row: %d, %s | %s", code, out.String(), errOut.String())
+	}
+	st, err = state.Open(filepath.Join(root, ".respex", "state.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	applies, err := st.ListApplies()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(applies) != 2 {
+		t.Fatalf("want 2 apply rows, got %d", len(applies))
+	}
+	retry := applies[0]
+	if retry.ExitCode == nil || *retry.ExitCode != 0 || retry.FinishedAt == nil {
+		t.Fatalf("re-run row not finished with exit 0: %+v", retry)
+	}
+	applied, err := st.IsApplied(1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !applied {
+		t.Fatal("v1 not marked applied after re-run")
 	}
 }
