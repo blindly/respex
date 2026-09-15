@@ -136,10 +136,10 @@ Guards, in order:
    `nothing to do (v<N> already applied)` and exit 0. Failed or interrupted
    applies do not count, so re-running after a failure retries.
 
-Then: build the apply prompt, resolve the adapter argv, execute the agent
-(Section 7), tee output to a log, record the apply row, print a summary
-(version, agent, duration, log path) and a hint to review with
-`git diff` (git repos only).
+Then: build the apply prompt, resolve the adapter argv, insert the apply row
+(its id names the log file), execute the agent with output tee'd
+(Section 7), and print a summary (version, agent, duration, log path) plus a
+`git diff` review hint (git repos only).
 
 `--agent` accepts a one-off command template in TOML array form, e.g.
 `--agent '["gemini", "-p", "{{prompt}}"]'`.
@@ -188,7 +188,7 @@ CREATE INDEX idx_applies_version ON applies(version_id);
 ```
 
 - Schema versioning: `meta.schema_version = 1`; a `state` package migration
-  step applies upgrades in order. v1 is the only version initially.
+  step applies upgrades in order. Schema version 1 is the only one initially.
 - History is user data: no command ever deletes rows or the database. Corrupt
   DB → error message suggesting manual recovery.
 - The database is local-only and gitignored; a fresh clone starts with no
@@ -198,8 +198,8 @@ CREATE INDEX idx_applies_version ON applies(version_id);
 
 Discovery (highest precedence last): global `~/.config/respex/config.toml`
 (`%AppData%\respex\config.toml` on Windows) merged under project
-`.respex/config.toml`. Maps merge shallowly; `[agent]` and `[prompts]` tables
-merge key-by-key; arrays replace.
+`.respex/config.toml`. Top-level keys from the project file win; within
+`[agent]` and `[prompts]`, keys merge individually; arrays replace wholesale.
 
 ```toml
 spec = "SPEC.md"                 # spec file path, relative to repo root
@@ -251,9 +251,10 @@ byte-identical to it.
 
 1. Substitute placeholders in each argv element (`{{prompt}}`, `{{spec_path}}`).
 2. `exec.Cmd`: argv, `Dir` = repo root, env = parent + config extras.
-3. stdout and stderr each tee to the terminal and to
-   `.respex/logs/<seq>-<command>.log` (sequence = applies row id for apply;
-   a counter file for refine/draft).
+3. stdout and stderr each tee to the terminal and to a repo-relative log path
+   under `.respex/logs/`: `<applies.id>-apply.log` for apply; UTC timestamp
+   (`20060102T150405Z-<command>.log`) for refine/draft; stored in
+   `applies.log_path`.
 4. Success = exit code 0. stderr/stdout content is advisory only.
 5. Ctrl+C / termination mid-run: the apply row keeps `NULL` `finished_at` /
    `exit_code`; the next `apply` warns "previous apply did not finish" and
