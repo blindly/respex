@@ -4,21 +4,12 @@ import (
 	"fmt"
 	"io"
 	"strconv"
-	"strings"
 
 	difflib "github.com/pmezard/go-difflib/difflib"
 
 	"respex/internal/spec"
 	"respex/internal/ui"
 )
-
-func splitLines(b []byte) []string {
-	s := strings.TrimSuffix(string(b), "\n")
-	if s == "" {
-		return []string{}
-	}
-	return strings.Split(s, "\n")
-}
 
 func runDiff(args []string, out, errOut io.Writer) int {
 	w, err := discover()
