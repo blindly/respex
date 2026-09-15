@@ -139,6 +139,10 @@ func TestLifecycleEndToEnd(t *testing.T) {
 	if code != 1 || !strings.Contains(out, "spec changed since last commit") {
 		t.Fatalf("dirty guard: %d, %s", code, out)
 	}
+	marker3, _ := os.ReadFile(filepath.Join(root, "marker"))
+	if strings.Count(string(marker3), "\n---\n") != 3 {
+		t.Fatalf("dirty-spec apply must not run the agent, marker:\n%s", marker3)
+	}
 }
 
 func TestApplyFailureThenRetry(t *testing.T) {
