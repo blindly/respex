@@ -18,7 +18,7 @@ import (
 
 func runApply(args []string, out, errOut io.Writer) int {
 	fs := newFlagSet("apply", errOut)
-	oneOff := fs.String("agent", "", `one-off adapter in TOML array form: --agent '["gemini", "-p", "{{prompt}}"]'`)
+	oneOff := fs.String("agent", "", `one-off adapter in TOML array form: --agent '["gemini", "-p", "{{prompt}}"]' (delivery mode is inherited from config)`)
 	if err := fs.Parse(args); err != nil {
 		return fail(errOut, err)
 	}
@@ -101,10 +101,16 @@ func runApply(args []string, out, errOut io.Writer) int {
 	}
 	logRel := filepath.Join(".respex", "logs", fmt.Sprintf("%d-apply.log", id))
 	if err := st.SetApplyLogPath(id, logRel); err != nil {
+		if ferr := st.FinishApply(id, -1, time.Now()); ferr != nil {
+			return fail(errOut, ferr)
+		}
 		return fail(errOut, err)
 	}
 	f, err := os.Create(filepath.Join(w.root, logRel))
 	if err != nil {
+		if ferr := st.FinishApply(id, -1, time.Now()); ferr != nil {
+			return fail(errOut, ferr)
+		}
 		return fail(errOut, err)
 	}
 	defer f.Close()
