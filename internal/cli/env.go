@@ -1,0 +1,86 @@
+package cli
+
+import (
+	"errors"
+	"os"
+	"path/filepath"
+
+	"respex/internal/agent"
+	"respex/internal/config"
+	"respex/internal/state"
+)
+
+// workspace is the resolved environment for a command.
+type workspace struct {
+	root string
+	cfg  config.Config
+}
+
+var errNotProject = errors.New("not a respex project — run `respex new`")
+
+// discover walks up from the working directory looking for .respex/.
+func discover() (*workspace, error) {
+	p, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+	for {
+		if fi, err := os.Stat(filepath.Join(p, ".respex")); err == nil && fi.IsDir() {
+			return loadWorkspace(p)
+		}
+		parent := filepath.Dir(p)
+		if parent == p {
+			return nil, errNotProject
+		}
+		p = parent
+	}
+}
+
+func loadWorkspace(root string) (*workspace, error) {
+	cfg, err := loadConfig(root)
+	if err != nil {
+		return nil, err
+	}
+	return &workspace{root: root, cfg: cfg}, nil
+}
+
+func loadConfig(root string) (config.Config, error) {
+	global, gerr := config.GlobalPath()
+	if gerr != nil {
+		global = ""
+	}
+	return config.Load(global, filepath.Join(root, ".respex", "config.toml"))
+}
+
+func (w *workspace) specPath() string { return filepath.Join(w.root, w.cfg.Spec) }
+
+func (w *workspace) openState() (*state.DB, error) {
+	return state.Open(filepath.Join(w.root, ".respex", "state.db"))
+}
+
+// adapter resolves the configured agent; the second return is its display name.
+func (w *workspace) adapter() (agent.Adapter, string, error) {
+	if len(w.cfg.Agent.Command) == 0 {
+		return agent.Adapter{}, "", errors.New(
+			"no agent configured — set [agent] command in .respex/config.toml")
+	}
+	delivery := w.cfg.Agent.Delivery
+	if delivery == "" {
+		delivery = agent.DeliveryArgv
+	}
+	return agent.Adapter{
+		Command:  w.cfg.Agent.Command,
+		Delivery: delivery,
+		Env:      w.cfg.Agent.Env,
+		Dir:      w.root,
+	}, w.cfg.Agent.Command[0], nil
+}
+
+// absSpecPath returns the absolute spec path.
+func (w *workspace) absSpecPath() string {
+	abs, err := filepath.Abs(w.specPath())
+	if err != nil {
+		return w.specPath()
+	}
+	return abs
+}
