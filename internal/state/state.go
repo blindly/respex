@@ -43,12 +43,12 @@ func Open(path string) (*DB, error) {
 	u := url.URL{Scheme: "file", OmitHost: true, Path: filepath.ToSlash(path)}
 	d, err := sql.Open("sqlite", u.String()+"?_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)")
 	if err != nil {
-		return nil, fmt.Errorf("open state %s: %w", path, err)
+		return nil, fmt.Errorf("open state %s: %w — if the database file is corrupt, recover .respex/state.db manually; respex never deletes it", path, err)
 	}
 	d.SetMaxOpenConns(1) // sqlite: serialize internal access
 	if err := d.Ping(); err != nil {
 		d.Close()
-		return nil, fmt.Errorf("open state %s: %w", path, err)
+		return nil, fmt.Errorf("open state %s: %w — if the database file is corrupt, recover .respex/state.db manually; respex never deletes it", path, err)
 	}
 	s := &DB{db: d}
 	if err := s.migrate(); err != nil {

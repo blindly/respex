@@ -29,7 +29,7 @@ const Skeleton = `# <Project title>
 
 ## Open Questions
 
-- <Unresolved decision.>
+- <Unresolved decisions.>
 `
 
 // Read returns the spec file contents; empty files are an error.

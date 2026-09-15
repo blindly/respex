@@ -51,7 +51,7 @@ func TestReadMissingFails(t *testing.T) {
 }
 
 func TestSkeletonUnresolvedDecision(t *testing.T) {
-	if !strings.Contains(Skeleton, "- <Unresolved decision.>") {
+	if !strings.Contains(Skeleton, "- <Unresolved decisions.>") {
 		t.Fatalf("Skeleton missing bullet form, got:\n%s", Skeleton)
 	}
 }
