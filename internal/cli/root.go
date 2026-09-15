@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"flag"
 	"fmt"
 	"io"
 )
@@ -51,4 +52,11 @@ Commands:
 func fail(w io.Writer, err error) int {
 	fmt.Fprintln(w, "respex: "+err.Error())
 	return 1
+}
+
+// newFlagSet returns a flag set that reports parse errors through errOut.
+func newFlagSet(name string, errOut io.Writer) *flag.FlagSet {
+	fs := flag.NewFlagSet(name, flag.ContinueOnError)
+	fs.SetOutput(errOut)
+	return fs
 }

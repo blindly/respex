@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"flag"
 	"fmt"
 	"io"
 	"time"
@@ -10,9 +9,14 @@ import (
 )
 
 func runCommit(args []string, out, errOut io.Writer) int {
-	fs := flag.NewFlagSet("commit", flag.ExitOnError)
+	fs := newFlagSet("commit", errOut)
 	msg := fs.String("m", "", "commit message")
-	fs.Parse(args)
+	if err := fs.Parse(args); err != nil {
+		return fail(errOut, err)
+	}
+	if fs.NArg() != 0 {
+		return fail(errOut, fmt.Errorf("unexpected argument %q — usage: respex commit [-m msg]", fs.Arg(0)))
+	}
 
 	w, err := discover()
 	if err != nil {

@@ -48,15 +48,32 @@ func TestCommitIdenticalWarns(t *testing.T) {
 		t.Fatal("first commit failed")
 	}
 	out.Reset()
-	if code := runCommit(nil, &out, &out); code != 0 || !strings.Contains(out.String(), "unchanged") {
+	if code := runCommit(nil, &out, &out); code != 0 || !strings.Contains(out.String(), "unchanged") || !strings.Contains(out.String(), "committed v2") {
 		t.Fatalf("identical commit: %d, %s", code, out.String())
 	}
 }
 
 func TestCommitMissingSpec(t *testing.T) {
 	setupProject(t)
-	var out bytes.Buffer
-	if code := runCommit(nil, &out, &out); code != 1 {
-		t.Fatal("commit without spec must fail")
+	var out, errOut bytes.Buffer
+	if code := runCommit(nil, &out, &errOut); code != 1 || !strings.Contains(errOut.String(), "read spec") || out.String() != "" {
+		t.Fatalf("commit without spec: %d, out=%q err=%q", code, out.String(), errOut.String())
+	}
+}
+
+func TestCommitRejectsPositionalArgs(t *testing.T) {
+	root := setupProject(t)
+	writeSpec(t, root, "# one\n")
+	var out, errOut bytes.Buffer
+	if code := runCommit([]string{"fix", "the", "login", "bug"}, &out, &errOut); code != 1 || !strings.Contains(errOut.String(), "unexpected argument") || out.String() != "" {
+		t.Fatalf("positional args: %d, out=%q err=%q", code, out.String(), errOut.String())
+	}
+}
+
+func TestCommitFlagParseError(t *testing.T) {
+	setupProject(t)
+	var out, errOut bytes.Buffer
+	if code := runCommit([]string{"-bogus"}, &out, &errOut); code != 1 || errOut.String() == "" || out.String() != "" {
+		t.Fatalf("flag parse error: %d, out=%q err=%q", code, out.String(), errOut.String())
 	}
 }

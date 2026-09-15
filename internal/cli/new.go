@@ -43,7 +43,7 @@ func runNew(args []string, out, errOut io.Writer) int {
 		desc = args[0]
 	}
 	if _, err := os.Stat(filepath.Join(".respex", "state.db")); err == nil {
-		return fail(errOut, fmt.Errorf("this directory is already a respex project (.respex/state.db exists) — delete .respex/state.db to re-initialize"))
+		return fail(errOut, fmt.Errorf("this directory is already a respex project (.respex/state.db exists) — delete .respex/ and the spec file to re-initialize"))
 	}
 	cfg, err := loadConfig(".")
 	if err != nil {
