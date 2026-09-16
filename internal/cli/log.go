@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/blindly/respex/internal/agent"
 	"github.com/blindly/respex/internal/spec"
 )
 
@@ -38,6 +39,10 @@ func runLog(args []string, out, errOut io.Writer) int {
 	if err != nil {
 		return fail(errOut, err)
 	}
+	baselines, err := st.ListBaselines()
+	if err != nil {
+		return fail(errOut, err)
+	}
 
 	fmt.Fprintln(out, "versions:")
 	if len(versions) == 0 {
@@ -58,6 +63,14 @@ func runLog(args []string, out, errOut io.Writer) int {
 	for _, a := range applies {
 		fmt.Fprintf(out, "  #%d  v%d  %s  %s  %s  %s\n", a.ID, a.VersionID, a.Agent,
 			a.Outcome, a.StartedAt.Format(time.RFC3339), a.LogPath)
+	}
+	fmt.Fprintln(out, "baselines:")
+	if len(baselines) == 0 {
+		fmt.Fprintln(out, "  (none)")
+	}
+	for _, b := range baselines {
+		fmt.Fprintf(out, "  #%d  %s  %s  %s  %s\n", b.ID, b.Agent, b.Outcome,
+			b.StartedAt.Format(time.RFC3339), b.LogPath)
 	}
 	fmt.Fprintln(out, "refinements:")
 	if len(refines) == 0 {
@@ -130,7 +143,7 @@ func runStatus(args []string, out, errOut io.Writer) int {
 		if unfinished {
 			applyState = "running"
 		} else {
-			applyState = "refine, restore, or edit running"
+			applyState = "baseline, refine, restore, or edit running"
 		}
 	} else {
 		lock.Close()
@@ -150,6 +163,33 @@ func runStatus(args []string, out, errOut io.Writer) int {
 		refined = fmt.Sprintf("%d times; last %s at %s", len(refines), refines[0].Outcome, refines[0].StartedAt.Format(time.RFC3339))
 	}
 	fmt.Fprintf(out, "refined:     %s\n", refined)
+	baselines, err := st.ListBaselines()
+	if err != nil {
+		return fail(errOut, err)
+	}
+	baselineState := "never"
+	if len(baselines) > 0 {
+		baselineState = fmt.Sprintf("%d times; last %s at %s", len(baselines), baselines[0].Outcome, baselines[0].StartedAt.Format(time.RFC3339))
+	}
+	fmt.Fprintf(out, "baselined:   %s\n", baselineState)
+	refineState := "ready"
+	if readErr == nil {
+		workingHash := spec.Hash(content)
+		if workingHash == spec.Hash([]byte(spec.Skeleton)) {
+			refineState = "untouched skeleton; baseline the repository or edit the spec"
+		} else if len(refines) > 0 && refines[0].Outcome == "unchanged" && refines[0].AfterHash == workingHash {
+			if adapter, _, adapterErr := w.adapter(); adapterErr == nil {
+				tmpl := agent.PromptRefine
+				if w.cfg.Prompts.Refine != "" {
+					tmpl = w.cfg.Prompts.Refine
+				}
+				if refines[0].InputFingerprint == refineFingerprint(workingHash, tmpl, adapter) {
+					refineState = "same input was last unchanged; edit or use --force"
+				}
+			}
+		}
+	}
+	fmt.Fprintf(out, "refine:      %s\n", refineState)
 	agentLine := "(not configured)"
 	if len(w.cfg.Agent.Command) > 0 {
 		agentLine = w.cfg.Agent.Command[0] + " (configured)"

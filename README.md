@@ -38,9 +38,22 @@ go build .
     respex apply                                    # agent makes the repo match the spec
     respex apply                                    # → "nothing to do (v1 already applied)"
 
+For an existing repository, derive an initial spec from observed code, tests,
+documentation, and configuration:
+
+```text
+respex init
+respex baseline --intent "what this project is meant to accomplish"
+respex diff --baseline latest
+respex commit -m "baseline existing implementation"
+```
+
+Use `respex baseline --merge` when the spec already contains meaningful content.
+The agent preserves established intent and records conflicts as open questions.
+
 Edit `SPEC.md` by hand any time; `commit` snapshots whatever is there.
 
-`respex log` shows versions, refinements, and applies; `respex status`
+`respex log` shows versions, baselines, refinements, and applies; `respex status`
 summarizes the current spec and operation state. `respex restore` recovers a
 saved refinement snapshot.
 
@@ -97,7 +110,10 @@ when Respex exits.
 `.respex/state.db` (SQLite, gitignored) stores spec snapshots, refinement history,
 and apply history. Refinement is repeatable; `respex status` shows the count and
 latest result, while `respex log` shows every run. Each refinement saves the spec
-before and after the agent runs. Review or restore one with:
+before and after the agent runs. Refining the
+untouched generated skeleton is rejected, as is repeating the same spec, prompt,
+and agent configuration after an unchanged result. Edit the spec first or use
+`respex refine --force` to retry explicitly. Review or restore one with:
 
 ```text
 respex diff --refine latest

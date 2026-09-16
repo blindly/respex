@@ -12,6 +12,14 @@ Write concrete, testable requirements. Do not create or modify any other files.
 
 Idea: {{prompt}}`
 
+	PromptBaseline = `Derive a baseline design specification for the existing repository and write it at {{spec_path}}.
+Inspect the repository thoroughly, including documentation, source code, tests, configuration, build files, public interfaces, and platform assumptions.
+Describe observable current behavior as concrete requirements. Do not invent intent or non-goals that cannot be established from evidence; put uncertainty in Open Questions.
+Use exactly these sections: Intent, Scope, Non-Goals, Requirements, Open Questions.
+Do not create or modify any other files.
+
+Additional intent supplied by the user: {{prompt}}`
+
 	PromptRefine = `Refine the design specification at {{spec_path}}.
 First read the spec, then inspect this repository to ground the critique in
 what actually exists (real file names, real constraints).

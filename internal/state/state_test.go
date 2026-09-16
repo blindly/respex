@@ -22,7 +22,7 @@ func open(t *testing.T) *DB {
 
 func TestFreshOpenCreatesCurrentSchema(t *testing.T) {
 	d := open(t)
-	if v, err := d.SchemaVersion(); err != nil || v != 3 {
+	if v, err := d.SchemaVersion(); err != nil || v != 5 {
 		t.Fatalf("schema version = %d, %v", v, err)
 	}
 }
@@ -128,14 +128,14 @@ func TestMigrateLegacyDatabasePreservesHistory(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer migrated.Close()
-	if version, err := migrated.SchemaVersion(); err != nil || version != 3 {
+	if version, err := migrated.SchemaVersion(); err != nil || version != 5 {
 		t.Fatalf("schema version = %d, %v", version, err)
 	}
 	applies, err := migrated.ListApplies()
 	if err != nil || len(applies) != 1 || applies[0].Outcome != "stale" {
 		t.Fatalf("migrated applies = %+v, %v", applies, err)
 	}
-	if _, err := migrated.InsertRefine("agent", "unchanged", "hash", "hash", []byte("spec"), []byte("spec"), "", time.Now(), time.Now()); err != nil {
+	if _, err := migrated.InsertRefine("agent", "unchanged", "hash", "hash", []byte("spec"), []byte("spec"), "", "", time.Now(), time.Now()); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -184,8 +184,8 @@ func TestMigrateRollback(t *testing.T) {
 		return errors.New("boom")
 	})
 
-	if _, err := Open(p); err == nil || !strings.Contains(err.Error(), "migrate to v4") {
-		t.Fatalf("Open with failing migration: err = %v, want migrate to v4 error", err)
+	if _, err := Open(p); err == nil || !strings.Contains(err.Error(), "migrate to v6") {
+		t.Fatalf("Open with failing migration: err = %v, want migrate to v6 error", err)
 	}
 
 	migrations = orig
@@ -194,8 +194,8 @@ func TestMigrateRollback(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { d2.Close() })
-	if v, err := d2.SchemaVersion(); err != nil || v != 3 {
-		t.Fatalf("schema version after failed migration = %d, %v; want 3", v, err)
+	if v, err := d2.SchemaVersion(); err != nil || v != 5 {
+		t.Fatalf("schema version after failed migration = %d, %v; want 5", v, err)
 	}
 	var n int
 	if err := d2.db.QueryRow(`SELECT count(*) FROM sqlite_master

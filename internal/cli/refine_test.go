@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/blindly/respex/internal/spec"
 	"github.com/blindly/respex/internal/state"
 )
 
@@ -37,10 +38,15 @@ func TestRefineHistoryIsRepeatable(t *testing.T) {
 	root := setupProject(t)
 	writeSpec(t, root, "# same\n")
 	writeConfig(t, root, fmt.Sprintf("[agent]\ncommand = [%q, \"{{prompt}}\"]\n", fakeBin))
-	for range 2 {
-		if code := runRefine(nil, &bytes.Buffer{}, &bytes.Buffer{}); code != 0 {
-			t.Fatalf("refine exit = %d", code)
-		}
+	if code := runRefine(nil, &bytes.Buffer{}, &bytes.Buffer{}); code != 0 {
+		t.Fatalf("first refine exit = %d", code)
+	}
+	var guardOut bytes.Buffer
+	if code := runRefine(nil, &bytes.Buffer{}, &guardOut); code != 1 || !strings.Contains(guardOut.String(), "last refined unchanged") {
+		t.Fatalf("repeated refine = %d, %s", code, guardOut.String())
+	}
+	if code := runRefine([]string{"--force"}, &bytes.Buffer{}, &bytes.Buffer{}); code != 0 {
+		t.Fatalf("forced refine exit = %d", code)
 	}
 	st, err := state.Open(filepath.Join(root, ".respex", "state.db"))
 	if err != nil {
@@ -60,6 +66,19 @@ func TestRefineHistoryIsRepeatable(t *testing.T) {
 	var out, errOut bytes.Buffer
 	if code := runStatus(nil, &out, &errOut); code != 0 || !strings.Contains(out.String(), "refined:     2 times") {
 		t.Fatalf("status after refinements = %d, %s | %s", code, out.String(), errOut.String())
+	}
+}
+
+func TestRefineRejectsUntouchedSkeleton(t *testing.T) {
+	root := setupProject(t)
+	writeSpec(t, root, spec.Skeleton)
+	writeConfig(t, root, fmt.Sprintf("[agent]\ncommand = [%q, \"{{prompt}}\"]\n", fakeBin))
+	var out, errOut bytes.Buffer
+	if code := runRefine(nil, &out, &errOut); code != 1 || !strings.Contains(errOut.String(), "generated skeleton") {
+		t.Fatalf("skeleton refine = %d, %s | %s", code, out.String(), errOut.String())
+	}
+	if code := runRefine([]string{"--force"}, &out, &errOut); code != 0 {
+		t.Fatalf("forced skeleton refine = %d, %s | %s", code, out.String(), errOut.String())
 	}
 }
 

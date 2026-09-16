@@ -34,7 +34,7 @@ type Apply struct {
 	LogPath    string
 }
 
-type Refine struct {
+type Baseline struct {
 	ID            int64
 	Agent         string
 	StartedAt     time.Time
@@ -45,6 +45,20 @@ type Refine struct {
 	BeforeContent []byte
 	AfterContent  []byte
 	LogPath       string
+}
+
+type Refine struct {
+	ID               int64
+	Agent            string
+	StartedAt        time.Time
+	FinishedAt       time.Time
+	Outcome          string
+	BeforeHash       string
+	AfterHash        string
+	BeforeContent    []byte
+	AfterContent     []byte
+	InputFingerprint string
+	LogPath          string
 }
 
 // DB wraps the SQLite handle and owns migrations.
@@ -133,6 +147,25 @@ var migrations = []func(tx *sql.Tx) error{
 			}
 		}
 		return nil
+	},
+	func(tx *sql.Tx) error {
+		_, err := tx.Exec(`ALTER TABLE refinements ADD COLUMN input_fingerprint TEXT NOT NULL DEFAULT ''`)
+		return err
+	},
+	func(tx *sql.Tx) error {
+		_, err := tx.Exec(`CREATE TABLE baselines (
+			id             INTEGER PRIMARY KEY AUTOINCREMENT,
+			agent          TEXT NOT NULL,
+			started_at     TEXT NOT NULL,
+			finished_at    TEXT NOT NULL,
+			outcome        TEXT NOT NULL,
+			before_hash    TEXT NOT NULL,
+			after_hash     TEXT NOT NULL,
+			before_content BLOB NOT NULL,
+			after_content  BLOB NOT NULL,
+			log_path       TEXT NOT NULL
+		)`)
+		return err
 	},
 }
 
@@ -387,11 +420,11 @@ func (s *DB) ListApplies() ([]Apply, error) {
 	return out, nil
 }
 
-func (s *DB) InsertRefine(agent, outcome, beforeHash, afterHash string, beforeContent, afterContent []byte, logPath string, started, finished time.Time) (int64, error) {
+func (s *DB) InsertRefine(agent, outcome, beforeHash, afterHash string, beforeContent, afterContent []byte, inputFingerprint, logPath string, started, finished time.Time) (int64, error) {
 	res, err := s.db.Exec(`INSERT INTO refinements
-		(agent, started_at, finished_at, outcome, before_hash, after_hash, before_content, after_content, log_path)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, agent, started.UTC().Format(time.RFC3339),
-		finished.UTC().Format(time.RFC3339), outcome, beforeHash, afterHash, beforeContent, afterContent, logPath)
+		(agent, started_at, finished_at, outcome, before_hash, after_hash, before_content, after_content, input_fingerprint, log_path)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, agent, started.UTC().Format(time.RFC3339),
+		finished.UTC().Format(time.RFC3339), outcome, beforeHash, afterHash, beforeContent, afterContent, inputFingerprint, logPath)
 	if err != nil {
 		return 0, fmt.Errorf("insert refine: %w", err)
 	}
@@ -399,7 +432,7 @@ func (s *DB) InsertRefine(agent, outcome, beforeHash, afterHash string, beforeCo
 }
 
 func (s *DB) ListRefines() ([]Refine, error) {
-	rows, err := s.db.Query(`SELECT id, agent, started_at, finished_at, outcome, before_hash, after_hash, before_content, after_content, log_path
+	rows, err := s.db.Query(`SELECT id, agent, started_at, finished_at, outcome, before_hash, after_hash, before_content, after_content, input_fingerprint, log_path
 		FROM refinements ORDER BY id DESC`)
 	if err != nil {
 		return nil, fmt.Errorf("list refinements: %w", err)
@@ -409,7 +442,7 @@ func (s *DB) ListRefines() ([]Refine, error) {
 	for rows.Next() {
 		var r Refine
 		var started, finished string
-		if err := rows.Scan(&r.ID, &r.Agent, &started, &finished, &r.Outcome, &r.BeforeHash, &r.AfterHash, &r.BeforeContent, &r.AfterContent, &r.LogPath); err != nil {
+		if err := rows.Scan(&r.ID, &r.Agent, &started, &finished, &r.Outcome, &r.BeforeHash, &r.AfterHash, &r.BeforeContent, &r.AfterContent, &r.InputFingerprint, &r.LogPath); err != nil {
 			return nil, fmt.Errorf("list refinements: %w", err)
 		}
 		r.StartedAt, err = parseRFC3339(started)
@@ -447,4 +480,66 @@ func (s *DB) LatestRefine() (*Refine, error) {
 		return nil, err
 	}
 	return &refines[0], nil
+}
+
+func (s *DB) InsertBaseline(agent, outcome, beforeHash, afterHash string, beforeContent, afterContent []byte, logPath string, started, finished time.Time) (int64, error) {
+	res, err := s.db.Exec(`INSERT INTO baselines
+		(agent, started_at, finished_at, outcome, before_hash, after_hash, before_content, after_content, log_path)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, agent, started.UTC().Format(time.RFC3339),
+		finished.UTC().Format(time.RFC3339), outcome, beforeHash, afterHash, beforeContent, afterContent, logPath)
+	if err != nil {
+		return 0, fmt.Errorf("insert baseline: %w", err)
+	}
+	return res.LastInsertId()
+}
+
+func (s *DB) ListBaselines() ([]Baseline, error) {
+	rows, err := s.db.Query(`SELECT id, agent, started_at, finished_at, outcome, before_hash, after_hash, before_content, after_content, log_path
+		FROM baselines ORDER BY id DESC`)
+	if err != nil {
+		return nil, fmt.Errorf("list baselines: %w", err)
+	}
+	defer rows.Close()
+	var out []Baseline
+	for rows.Next() {
+		var b Baseline
+		var started, finished string
+		if err := rows.Scan(&b.ID, &b.Agent, &started, &finished, &b.Outcome, &b.BeforeHash, &b.AfterHash, &b.BeforeContent, &b.AfterContent, &b.LogPath); err != nil {
+			return nil, fmt.Errorf("list baselines: %w", err)
+		}
+		b.StartedAt, err = parseRFC3339(started)
+		if err != nil {
+			return nil, fmt.Errorf("baselines.started_at: %w", err)
+		}
+		b.FinishedAt, err = parseRFC3339(finished)
+		if err != nil {
+			return nil, fmt.Errorf("baselines.finished_at: %w", err)
+		}
+		out = append(out, b)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("list baselines: %w", err)
+	}
+	return out, nil
+}
+
+func (s *DB) GetBaseline(id int64) (*Baseline, error) {
+	baselines, err := s.ListBaselines()
+	if err != nil {
+		return nil, err
+	}
+	for i := range baselines {
+		if baselines[i].ID == id {
+			return &baselines[i], nil
+		}
+	}
+	return nil, fmt.Errorf("no such baseline #%d", id)
+}
+
+func (s *DB) LatestBaseline() (*Baseline, error) {
+	baselines, err := s.ListBaselines()
+	if err != nil || len(baselines) == 0 {
+		return nil, err
+	}
+	return &baselines[0], nil
 }

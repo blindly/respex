@@ -25,7 +25,26 @@ func runDiff(args []string, out, errOut io.Writer) int {
 
 	var fromLabel, toLabel string
 	var oldC, newC []byte
-	if len(args) == 2 && args[0] == "--refine" {
+	if len(args) == 2 && args[0] == "--baseline" {
+		var b *state.Baseline
+		if args[1] == "latest" {
+			b, err = st.LatestBaseline()
+			if err == nil && b == nil {
+				return fail(errOut, fmt.Errorf("no baselines yet"))
+			}
+		} else {
+			id, parseErr := strconv.Atoi(args[1])
+			if parseErr != nil {
+				return fail(errOut, fmt.Errorf("usage: respex diff --baseline <id|latest>"))
+			}
+			b, err = st.GetBaseline(int64(id))
+		}
+		if err != nil {
+			return fail(errOut, err)
+		}
+		oldC, newC = b.BeforeContent, b.AfterContent
+		fromLabel, toLabel = fmt.Sprintf("baseline-%d-before", b.ID), fmt.Sprintf("baseline-%d-after", b.ID)
+	} else if len(args) == 2 && args[0] == "--refine" {
 		var r *state.Refine
 		if args[1] == "latest" {
 			r, err = st.LatestRefine()
@@ -77,7 +96,7 @@ func runDiff(args []string, out, errOut io.Writer) int {
 			oldC, fromLabel = va.Content, fmt.Sprintf("v%d", va.ID)
 			newC, toLabel = vb.Content, fmt.Sprintf("v%d", vb.ID)
 		default:
-			return fail(errOut, fmt.Errorf("usage: respex diff [vA vB] | --refine <id|latest>"))
+			return fail(errOut, fmt.Errorf("usage: respex diff [vA vB] | --refine <id|latest> | --baseline <id|latest>"))
 		}
 	}
 

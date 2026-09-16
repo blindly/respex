@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/blindly/respex/internal/agent"
@@ -15,14 +16,20 @@ import (
 	"github.com/blindly/respex/internal/ui"
 )
 
+func refineFingerprint(specHash, prompt string, adapter agent.Adapter) string {
+	parts := []string{specHash, prompt, adapter.Delivery, strings.Join(adapter.Command, "\x00"), strings.Join(adapter.Env, "\x00")}
+	return spec.Hash([]byte(strings.Join(parts, "\x01")))
+}
+
 func runRefine(args []string, out, errOut io.Writer) int {
 	fs := newFlagSet("refine", errOut)
 	noProgress := fs.Bool("no-progress", false, "disable the interactive progress indicator")
+	force := fs.Bool("force", false, "run even when refinement is likely to be a no-op")
 	if err := fs.Parse(args); err != nil {
 		return fail(errOut, err)
 	}
 	if fs.NArg() != 0 {
-		return fail(errOut, fmt.Errorf("unexpected argument %q — usage: respex refine [--no-progress]", fs.Arg(0)))
+		return fail(errOut, fmt.Errorf("unexpected argument %q — usage: respex refine [--force] [--no-progress]", fs.Arg(0)))
 	}
 	w, err := discover()
 	if err != nil {
@@ -33,7 +40,7 @@ func runRefine(args []string, out, errOut io.Writer) int {
 		return fail(errOut, fmt.Errorf("acquire operation lock: %w", err))
 	}
 	if !locked {
-		return fail(errOut, errors.New("another apply, refine, restore, or edit is already running in this project"))
+		return fail(errOut, errors.New("another apply, baseline, refine, restore, or edit is already running in this project"))
 	}
 	defer lock.Close()
 	before, err := spec.Read(w.specPath())
@@ -41,6 +48,9 @@ func runRefine(args []string, out, errOut io.Writer) int {
 		return fail(errOut, err)
 	}
 	beforeHash := spec.Hash(before)
+	if !*force && beforeHash == spec.Hash([]byte(spec.Skeleton)) {
+		return fail(errOut, errors.New("the spec is still the generated skeleton — run `respex baseline` for an existing repository or `respex edit` first; use `respex refine --force`"))
+	}
 	a, name, err := w.adapter()
 	if err != nil {
 		return fail(errOut, err)
@@ -70,17 +80,28 @@ func runRefine(args []string, out, errOut io.Writer) int {
 	logPath := f.Name()
 	logRel := filepath.Join(".respex", "logs", filepath.Base(logPath))
 	started := time.Now()
+	inputFingerprint := ""
 	record := func(outcome, afterHash string, after []byte) error {
 		if after == nil {
 			after = []byte{}
 		}
-		_, err := st.InsertRefine(name, outcome, beforeHash, afterHash, before, after, logRel, started, time.Now())
+		_, err := st.InsertRefine(name, outcome, beforeHash, afterHash, before, after, inputFingerprint, logRel, started, time.Now())
 		return err
 	}
 
 	tmpl := agent.PromptRefine
 	if w.cfg.Prompts.Refine != "" {
 		tmpl = w.cfg.Prompts.Refine
+	}
+	inputFingerprint = refineFingerprint(beforeHash, tmpl, a)
+	latestRefine, err := st.LatestRefine()
+	if err != nil {
+		return fail(errOut, err)
+	}
+	if !*force && latestRefine != nil && latestRefine.Outcome == "unchanged" && latestRefine.AfterHash == beforeHash && latestRefine.InputFingerprint == inputFingerprint {
+		f.Close()
+		_ = os.Remove(logPath)
+		return fail(errOut, errors.New("this exact spec, prompt, and agent configuration was last refined unchanged — edit the spec or use `respex refine --force`"))
 	}
 	absSpec := w.absSpecPath()
 	label := fmt.Sprintf("refining via %s", name)

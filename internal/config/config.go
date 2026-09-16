@@ -22,9 +22,10 @@ type Agent struct {
 // Prompts holds per-stage prompt overrides. Empty string means "not set" —
 // later files cannot unset earlier values.
 type Prompts struct {
-	Draft  string `toml:"draft"`
-	Refine string `toml:"refine"`
-	Apply  string `toml:"apply"`
+	Draft    string `toml:"draft"`
+	Baseline string `toml:"baseline"`
+	Refine   string `toml:"refine"`
+	Apply    string `toml:"apply"`
 }
 
 // Config is the root configuration schema: spec file, agent settings, and
@@ -110,6 +111,9 @@ func merge(dst *Config, src Config) {
 	}
 	if src.Prompts.Draft != "" {
 		dst.Prompts.Draft = src.Prompts.Draft
+	}
+	if src.Prompts.Baseline != "" {
+		dst.Prompts.Baseline = src.Prompts.Baseline
 	}
 	if src.Prompts.Refine != "" {
 		dst.Prompts.Refine = src.Prompts.Refine

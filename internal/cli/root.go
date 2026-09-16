@@ -27,19 +27,20 @@ func Main(args []string, stdout, stderr io.Writer) int {
 }
 
 var commands = map[string]func(args []string, out, errOut io.Writer) int{
-	"init":    runNew,
-	"new":     runNew,
-	"commit":  runCommit,
-	"diff":    runDiff,
-	"apply":   runApply,
-	"refine":  runRefine,
-	"log":     runLog,
-	"status":  runStatus,
-	"restore": runRestore,
-	"config":  runConfig,
-	"edit":    runEdit,
-	"update":  runUpdate,
-	"doctor":  runDoctor,
+	"init":     runNew,
+	"new":      runNew,
+	"commit":   runCommit,
+	"diff":     runDiff,
+	"apply":    runApply,
+	"refine":   runRefine,
+	"baseline": runBaseline,
+	"log":      runLog,
+	"status":   runStatus,
+	"restore":  runRestore,
+	"config":   runConfig,
+	"edit":     runEdit,
+	"update":   runUpdate,
+	"doctor":   runDoctor,
 }
 
 func usage(w io.Writer) {
@@ -52,6 +53,7 @@ Commands:
   init       initialize Respex in the current repository
   new        compatibility alias for init
   edit       open the spec in the configured editor
+  baseline   derive a spec from an existing repository
   refine     agent critiques and rewrites the spec
   diff       diff working spec vs last commit (or two versions)
   commit     snapshot the working spec as the approved version

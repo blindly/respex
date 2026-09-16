@@ -37,12 +37,26 @@ const configTemplate = `# respex configuration
 # env = []
 
 [prompts]
-# Optional overrides for the built-in prompt templates. {{spec_path}} works in
-# all three; {{prompt}} is only substituted for draft (refine/apply pass none).
-# draft  = "..."
-# refine = "..."
-# apply  = "..."
+# Optional overrides for built-in prompts. {{spec_path}} works in all stages;
+# {{prompt}} carries the description for draft and optional intent for baseline.
+# draft    = "..."
+# baseline = "..."
+# refine   = "..."
+# apply    = "..."
 `
+
+func hasExistingProjectFiles() bool {
+	entries, err := os.ReadDir(".")
+	if err != nil {
+		return false
+	}
+	for _, entry := range entries {
+		if entry.Name() != ".git" && entry.Name() != ".respex" {
+			return true
+		}
+	}
+	return false
+}
 
 func runNew(args []string, out, errOut io.Writer) int {
 	fs := newFlagSet("init", errOut)
@@ -57,6 +71,7 @@ func runNew(args []string, out, errOut io.Writer) int {
 	if fs.NArg() == 1 {
 		desc = fs.Arg(0)
 	}
+	existingProject := hasExistingProjectFiles()
 	if _, err := os.Stat(filepath.Join(".respex", "state.db")); err == nil {
 		return fail(errOut, fmt.Errorf("this directory is already a respex project (.respex/state.db exists) — delete .respex/ and the spec file to re-initialize"))
 	}
@@ -100,6 +115,12 @@ func runNew(args []string, out, errOut io.Writer) int {
 		fmt.Fprintf(out, "created %s (skeleton)\n", cfg.Spec)
 		if desc != "" {
 			fmt.Fprintln(out, "no agent configured — set [agent] command in .respex/config.toml, then run `respex refine`")
+		} else if existingProject {
+			if len(cfg.Agent.Command) > 0 {
+				fmt.Fprintln(out, "existing repository detected — run `respex baseline` to derive the initial spec")
+			} else {
+				fmt.Fprintln(out, "existing repository detected — configure an agent, then run `respex baseline`")
+			}
 		} else {
 			fmt.Fprintln(out, "edit the spec, then run `respex commit` before `respex apply`")
 		}

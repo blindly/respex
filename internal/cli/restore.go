@@ -24,7 +24,7 @@ func runRestore(args []string, out, errOut io.Writer) int {
 		return fail(errOut, fmt.Errorf("acquire operation lock: %w", err))
 	}
 	if !locked {
-		return fail(errOut, fmt.Errorf("another apply, refine, restore, or edit is already running in this project"))
+		return fail(errOut, fmt.Errorf("another apply, baseline, refine, restore, or edit is already running in this project"))
 	}
 	defer lock.Close()
 	st, err := w.openState()
@@ -63,7 +63,7 @@ func runRestore(args []string, out, errOut io.Writer) int {
 	if err := os.WriteFile(w.specPath(), r.BeforeContent, 0o644); err != nil {
 		return fail(errOut, fmt.Errorf("restore spec: %w", err))
 	}
-	restoreID, err := st.InsertRefine("respex", "restored", spec.Hash(current), spec.Hash(r.BeforeContent), current, r.BeforeContent, "", started, time.Now())
+	restoreID, err := st.InsertRefine("respex", "restored", spec.Hash(current), spec.Hash(r.BeforeContent), current, r.BeforeContent, "", "", started, time.Now())
 	if err != nil {
 		if rollbackErr := os.WriteFile(w.specPath(), current, 0o644); rollbackErr != nil {
 			return fail(errOut, fmt.Errorf("record restore: %v; rollback spec: %w", err, rollbackErr))
