@@ -58,7 +58,9 @@ env = []
 ```
 
 Placeholders: `{{prompt}}` (instruction text), `{{spec_path}}` (spec file path).
-Success = exit code 0. Run output is captured under `.respex/logs/`. The timeout
+Agent CLIs must use their non-interactive mode; for Devin CLI, use
+`command = ["devin", "--print", "{{prompt}}"]`. Success = exit code 0. Run
+output is captured under `.respex/logs/`. The timeout
 applies to both refine and apply. Only one apply, refine, or restore can run per
 project; the lock is released automatically when Respex exits.
 

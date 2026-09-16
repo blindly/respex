@@ -2,9 +2,16 @@
 
 package agent
 
-import "os/exec"
+import (
+	"os/exec"
+	"syscall"
 
-func configureProcess(_ *exec.Cmd) {}
+	"golang.org/x/sys/windows"
+)
+
+func configureProcess(cmd *exec.Cmd) {
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: windows.CREATE_NO_WINDOW}
+}
 
 func killProcess(cmd *exec.Cmd) error {
 	return cmd.Process.Kill()

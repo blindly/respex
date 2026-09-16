@@ -6,7 +6,7 @@ import (
 	"io"
 )
 
-var version = "0.1.0"
+var version = "dev"
 
 func Main(args []string, stdout, stderr io.Writer) int {
 	if len(args) > 0 && (args[0] == "--version" || args[0] == "version") {
