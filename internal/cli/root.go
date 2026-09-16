@@ -27,6 +27,7 @@ func Main(args []string, stdout, stderr io.Writer) int {
 }
 
 var commands = map[string]func(args []string, out, errOut io.Writer) int{
+	"init":    runNew,
 	"new":     runNew,
 	"commit":  runCommit,
 	"diff":    runDiff,
@@ -48,7 +49,8 @@ Usage:
   respex <command> [args]
 
 Commands:
-  new        scaffold .respex/ + SPEC.md (agent-drafted with a description)
+  init       initialize Respex in the current repository
+  new        compatibility alias for init
   edit       open the spec in the configured editor
   refine     agent critiques and rewrites the spec
   diff       diff working spec vs last commit (or two versions)

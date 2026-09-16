@@ -45,13 +45,13 @@ const configTemplate = `# respex configuration
 `
 
 func runNew(args []string, out, errOut io.Writer) int {
-	fs := newFlagSet("new", errOut)
+	fs := newFlagSet("init", errOut)
 	noProgress := fs.Bool("no-progress", false, "disable the interactive progress indicator")
 	if err := fs.Parse(args); err != nil {
 		return fail(errOut, err)
 	}
 	if fs.NArg() > 1 {
-		return fail(errOut, fmt.Errorf("usage: respex new [--no-progress] [description]"))
+		return fail(errOut, fmt.Errorf("usage: respex init [--no-progress] [description]"))
 	}
 	desc := ""
 	if fs.NArg() == 1 {

@@ -8,7 +8,7 @@ import (
 	"os"
 )
 
-// Skeleton is the spec file written by `respex new` without a description.
+// Skeleton is the spec file written by `respex init` without a description.
 const Skeleton = `# <Project title>
 
 ## Intent

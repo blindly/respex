@@ -8,6 +8,21 @@ import (
 	"testing"
 )
 
+func TestInitAndNewAlias(t *testing.T) {
+	for _, command := range []string{"init", "new"} {
+		t.Run(command, func(t *testing.T) {
+			root := isolate(t)
+			var out, errOut bytes.Buffer
+			if code := Main([]string{command}, &out, &errOut); code != 0 {
+				t.Fatalf("%s = %d, %s | %s", command, code, out.String(), errOut.String())
+			}
+			if _, err := os.Stat(filepath.Join(root, "SPEC.md")); err != nil {
+				t.Fatalf("%s did not initialize project: %v", command, err)
+			}
+		})
+	}
+}
+
 func TestNewScaffold(t *testing.T) {
 	root := isolate(t)
 	var out bytes.Buffer

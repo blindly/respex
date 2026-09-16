@@ -18,7 +18,7 @@ type workspace struct {
 	cfg  config.Config
 }
 
-var errNotProject = errors.New("not a respex project — run `respex new`")
+var errNotProject = errors.New("not a respex project — run `respex init`")
 
 // discover walks up from the working directory looking for .respex/.
 func discover() (*workspace, error) {

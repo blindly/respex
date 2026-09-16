@@ -5,7 +5,7 @@ Spec-driven agentic development: one markdown spec per repo, applied by any agen
 `respex` manages the lifecycle of a design spec and dispatches any agentic CLI
 (Claude Code, Gemini CLI, Codex, aider, opencode, amp, …) to act on it:
 
-    new → refine → diff → commit → apply
+    init → refine → diff → commit → apply
 
 The spec is the durable source of truth; the codebase converges to it.
 
@@ -29,7 +29,7 @@ go build .
 
 ## Quick start
 
-    respex new "a CLI that converts CSV to JSON"   # scaffold + agent-drafted spec
+    respex init "a CLI that converts CSV to JSON"   # scaffold + agent-drafted spec
     respex edit                                     # open SPEC.md in your editor
     respex refine                                   # agent improves the spec (repo-aware)
     respex diff --refine latest                     # review exactly what the agent changed
@@ -126,7 +126,7 @@ Updates are installed only after the downloaded binary matches the release's
 
 ## Manual smoke test (per agent CLI)
 
-1. `respex new "demo"` in a scratch repo
+1. `respex init "demo"` in a scratch repo
 2. Set `[agent] command` for your CLI
 3. `respex refine` → `respex diff --refine latest` → review the proposal
 4. `respex commit` → `respex apply` → changes appear; review with `git diff`
