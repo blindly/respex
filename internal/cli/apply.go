@@ -51,6 +51,14 @@ func runApply(args []string, out, errOut io.Writer) int {
 		return fail(errOut, fmt.Errorf(
 			"spec changed since last commit — review with `respex diff`, then `respex commit`"))
 	}
+	lock, locked, err := tryApplyLock(filepath.Join(w.root, ".respex", "operation.lock"))
+	if err != nil {
+		return fail(errOut, fmt.Errorf("acquire operation lock: %w", err))
+	}
+	if !locked {
+		return fail(errOut, errors.New("another apply, refine, or restore is already running in this project"))
+	}
+	defer lock.Close()
 	applied, err := st.IsApplied(last.ID)
 	if err != nil {
 		return fail(errOut, err)
@@ -62,6 +70,9 @@ func runApply(args []string, out, errOut io.Writer) int {
 	if unfinished, err := st.HasUnfinishedApply(); err != nil {
 		return fail(errOut, err)
 	} else if unfinished {
+		if err := st.MarkUnfinishedAppliesStale(); err != nil {
+			return fail(errOut, err)
+		}
 		fmt.Fprintln(out, "warning: a previous apply did not finish; re-running")
 	}
 
@@ -115,12 +126,24 @@ func runApply(args []string, out, errOut io.Writer) int {
 	}
 	defer f.Close()
 
+	fmt.Fprintf(out, "applying v%d via %s; output: %s\n", last.ID, tpl[0], logRel)
 	start := time.Now()
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	signalCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
+	ctx, cancel := context.WithTimeout(signalCtx, w.cfg.AgentTimeout)
+	defer cancel()
 	code, err := a.Execute(ctx, instr, absSpec, f)
 	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			if ferr := st.FinishApplyWithOutcome(id, -1, "timed_out", time.Now()); ferr != nil {
+				return fail(errOut, ferr)
+			}
+			return fail(errOut, fmt.Errorf("apply v%d timed out after %s — log: %s", last.ID, w.cfg.AgentTimeout, logRel))
+		}
 		if errors.Is(err, context.Canceled) {
+			if ferr := st.FinishApplyWithOutcome(id, -1, "interrupted", time.Now()); ferr != nil {
+				return fail(errOut, ferr)
+			}
 			fmt.Fprintf(out, "apply interrupted — log: %s\n", logRel)
 			return 1
 		}

@@ -22,7 +22,7 @@ type SpecVersion struct {
 }
 
 // Apply is one agent run against a committed version. FinishedAt and
-// ExitCode are nil until the run completes; nil forever means interrupted.
+// ExitCode are nil while the run is active or after an unexpected exit.
 type Apply struct {
 	ID         int64
 	VersionID  int64
@@ -30,7 +30,21 @@ type Apply struct {
 	StartedAt  time.Time
 	FinishedAt *time.Time
 	ExitCode   *int
+	Outcome    string
 	LogPath    string
+}
+
+type Refine struct {
+	ID         int64
+	Agent      string
+	StartedAt  time.Time
+	FinishedAt time.Time
+	Outcome    string
+	BeforeHash    string
+	AfterHash     string
+	BeforeContent []byte
+	AfterContent  []byte
+	LogPath       string
 }
 
 // DB wraps the SQLite handle and owns migrations.
@@ -81,6 +95,38 @@ var migrations = []func(tx *sql.Tx) error{
 				log_path    TEXT NOT NULL
 			)`,
 			`CREATE INDEX idx_applies_version ON applies(version_id)`,
+		} {
+			if _, err := tx.Exec(stmt); err != nil {
+				return err
+			}
+		}
+		return nil
+	},
+	func(tx *sql.Tx) error {
+		for _, stmt := range []string{
+			`ALTER TABLE applies ADD COLUMN outcome TEXT NOT NULL DEFAULT 'running'`,
+			`UPDATE applies SET outcome = CASE WHEN finished_at IS NULL THEN 'stale' WHEN exit_code = 0 THEN 'succeeded' ELSE 'failed' END`,
+			`CREATE TABLE refinements (
+				id          INTEGER PRIMARY KEY AUTOINCREMENT,
+				agent       TEXT NOT NULL,
+				started_at  TEXT NOT NULL,
+				finished_at TEXT NOT NULL,
+				outcome     TEXT NOT NULL,
+				before_hash TEXT NOT NULL,
+				after_hash  TEXT NOT NULL,
+				log_path    TEXT NOT NULL
+			)`,
+		} {
+			if _, err := tx.Exec(stmt); err != nil {
+				return err
+			}
+		}
+		return nil
+	},
+	func(tx *sql.Tx) error {
+		for _, stmt := range []string{
+			`ALTER TABLE refinements ADD COLUMN before_content BLOB NOT NULL DEFAULT X''`,
+			`ALTER TABLE refinements ADD COLUMN after_content BLOB NOT NULL DEFAULT X''`,
 		} {
 			if _, err := tx.Exec(stmt); err != nil {
 				return err
@@ -229,8 +275,8 @@ func (s *DB) ListVersions() ([]SpecVersion, error) {
 // filled by SetApplyLogPath once the row id has named the file.
 func (s *DB) InsertApply(versionID int64, agent string, now time.Time) (int64, error) {
 	res, err := s.db.Exec(`INSERT INTO applies
-		(version_id, agent, started_at, finished_at, exit_code, log_path)
-		VALUES (?, ?, ?, NULL, NULL, '')`, versionID, agent, now.UTC().Format(time.RFC3339))
+		(version_id, agent, started_at, finished_at, exit_code, outcome, log_path)
+		VALUES (?, ?, ?, NULL, NULL, 'running', '')`, versionID, agent, now.UTC().Format(time.RFC3339))
 	if err != nil {
 		return 0, fmt.Errorf("insert apply: %w", err)
 	}
@@ -248,8 +294,16 @@ func (s *DB) SetApplyLogPath(id int64, logPath string) error {
 
 // FinishApply stamps the outcome of an apply run.
 func (s *DB) FinishApply(id int64, exitCode int, now time.Time) error {
-	_, err := s.db.Exec(`UPDATE applies SET finished_at = ?, exit_code = ? WHERE id = ?`,
-		now.UTC().Format(time.RFC3339), exitCode, id)
+	outcome := "failed"
+	if exitCode == 0 {
+		outcome = "succeeded"
+	}
+	return s.FinishApplyWithOutcome(id, exitCode, outcome, now)
+}
+
+func (s *DB) FinishApplyWithOutcome(id int64, exitCode int, outcome string, now time.Time) error {
+	_, err := s.db.Exec(`UPDATE applies SET finished_at = ?, exit_code = ?, outcome = ? WHERE id = ?`,
+		now.UTC().Format(time.RFC3339), exitCode, outcome, id)
 	if err != nil {
 		return fmt.Errorf("finish apply: %w", err)
 	}
@@ -261,7 +315,7 @@ func scanApply(row scanner) (*Apply, error) {
 	var started string
 	var finished sql.NullString
 	var exit sql.NullInt64
-	if err := row.Scan(&a.ID, &a.VersionID, &a.Agent, &started, &finished, &exit, &a.LogPath); err != nil {
+	if err := row.Scan(&a.ID, &a.VersionID, &a.Agent, &started, &finished, &exit, &a.Outcome, &a.LogPath); err != nil {
 		return nil, err
 	}
 	at, err := parseRFC3339(started)
@@ -293,6 +347,14 @@ func (s *DB) IsApplied(versionID int64) (bool, error) {
 	return exists, nil
 }
 
+func (s *DB) MarkUnfinishedAppliesStale() error {
+	_, err := s.db.Exec(`UPDATE applies SET outcome = 'stale' WHERE finished_at IS NULL`)
+	if err != nil {
+		return fmt.Errorf("mark stale applies: %w", err)
+	}
+	return nil
+}
+
 // HasUnfinishedApply reports whether any apply row lacks an outcome.
 func (s *DB) HasUnfinishedApply() (bool, error) {
 	var exists bool
@@ -305,7 +367,7 @@ func (s *DB) HasUnfinishedApply() (bool, error) {
 
 // ListApplies returns all apply rows, newest first.
 func (s *DB) ListApplies() ([]Apply, error) {
-	rows, err := s.db.Query(`SELECT id, version_id, agent, started_at, finished_at, exit_code, log_path
+	rows, err := s.db.Query(`SELECT id, version_id, agent, started_at, finished_at, exit_code, outcome, log_path
 		FROM applies ORDER BY id DESC`)
 	if err != nil {
 		return nil, fmt.Errorf("list applies: %w", err)
@@ -323,4 +385,66 @@ func (s *DB) ListApplies() ([]Apply, error) {
 		return nil, fmt.Errorf("list applies: %w", rErr)
 	}
 	return out, nil
+}
+
+func (s *DB) InsertRefine(agent, outcome, beforeHash, afterHash string, beforeContent, afterContent []byte, logPath string, started, finished time.Time) (int64, error) {
+	res, err := s.db.Exec(`INSERT INTO refinements
+		(agent, started_at, finished_at, outcome, before_hash, after_hash, before_content, after_content, log_path)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, agent, started.UTC().Format(time.RFC3339),
+		finished.UTC().Format(time.RFC3339), outcome, beforeHash, afterHash, beforeContent, afterContent, logPath)
+	if err != nil {
+		return 0, fmt.Errorf("insert refine: %w", err)
+	}
+	return res.LastInsertId()
+}
+
+func (s *DB) ListRefines() ([]Refine, error) {
+	rows, err := s.db.Query(`SELECT id, agent, started_at, finished_at, outcome, before_hash, after_hash, before_content, after_content, log_path
+		FROM refinements ORDER BY id DESC`)
+	if err != nil {
+		return nil, fmt.Errorf("list refinements: %w", err)
+	}
+	defer rows.Close()
+	var out []Refine
+	for rows.Next() {
+		var r Refine
+		var started, finished string
+		if err := rows.Scan(&r.ID, &r.Agent, &started, &finished, &r.Outcome, &r.BeforeHash, &r.AfterHash, &r.BeforeContent, &r.AfterContent, &r.LogPath); err != nil {
+			return nil, fmt.Errorf("list refinements: %w", err)
+		}
+		r.StartedAt, err = parseRFC3339(started)
+		if err != nil {
+			return nil, fmt.Errorf("refinements.started_at: %w", err)
+		}
+		r.FinishedAt, err = parseRFC3339(finished)
+		if err != nil {
+			return nil, fmt.Errorf("refinements.finished_at: %w", err)
+		}
+		out = append(out, r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("list refinements: %w", err)
+	}
+	return out, nil
+}
+
+func (s *DB) GetRefine(id int64) (*Refine, error) {
+	refines, err := s.ListRefines()
+	if err != nil {
+		return nil, err
+	}
+	for i := range refines {
+		if refines[i].ID == id {
+			return &refines[i], nil
+		}
+	}
+	return nil, fmt.Errorf("no such refinement #%d", id)
+}
+
+func (s *DB) LatestRefine() (*Refine, error) {
+	refines, err := s.ListRefines()
+	if err != nil || len(refines) == 0 {
+		return nil, err
+	}
+	return &refines[0], nil
 }

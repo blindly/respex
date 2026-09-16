@@ -33,7 +33,8 @@ var commands = map[string]func(args []string, out, errOut io.Writer) int{
 	"apply":  runApply,
 	"refine": runRefine,
 	"log":    runLog,
-	"status": runStatus,
+	"status":  runStatus,
+	"restore": runRestore,
 }
 
 func usage(w io.Writer) {
@@ -50,6 +51,7 @@ Commands:
   apply      agent makes the codebase match the committed spec
   log        show versions and applies
   status     summarize spec and state
+  restore    restore a saved refinement before-state
 `)
 }
 

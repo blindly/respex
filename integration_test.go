@@ -270,11 +270,11 @@ func TestApplyInterrupt(t *testing.T) {
 		t.Fatalf("interrupted apply output:\n%s", buf.String())
 	}
 
-	// The interrupted row stays unfinished: the re-run warns but proceeds.
+	// The interrupted run is recorded and a later apply can proceed.
 	write(t, filepath.Join(root, ".respex", "config.toml"),
 		fmt.Sprintf("[agent]\ncommand = [%q, \"{{prompt}}\"]\n", fakeBin))
 	out, code = run(t, root, "apply")
-	if code != 0 || !strings.Contains(out, "warning: a previous apply did not finish") || !strings.Contains(out, "applied v1") {
+	if code != 0 || strings.Contains(out, "warning: a previous apply did not finish") || !strings.Contains(out, "applied v1") {
 		t.Fatalf("apply after interrupt: %d, %s", code, out)
 	}
 }

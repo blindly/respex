@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 )
 
 func write(t *testing.T, path, content string) {
@@ -72,6 +73,25 @@ apply = "project-apply"
 	}
 	if cfg.Prompts.Refine != "global-refine" || cfg.Prompts.Apply != "project-apply" || cfg.Prompts.Draft != "" {
 		t.Fatalf("prompts merge wrong: %+v", cfg.Prompts)
+	}
+}
+
+func TestAgentTimeout(t *testing.T) {
+	dir := t.TempDir()
+	global := filepath.Join(dir, "global.toml")
+	project := filepath.Join(dir, "project.toml")
+	write(t, global, `apply_timeout = "2h"`)
+	write(t, project, `agent_timeout = "30m"`)
+	cfg, err := Load(global, project)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.AgentTimeout != 30*time.Minute {
+		t.Fatalf("agent timeout = %s", cfg.AgentTimeout)
+	}
+	write(t, project, `apply_timeout = "never"`)
+	if _, err := Load(global, project); err == nil || !strings.Contains(err.Error(), "invalid agent timeout") {
+		t.Fatalf("want invalid agent timeout error, got %v", err)
 	}
 }
 

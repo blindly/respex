@@ -93,13 +93,11 @@ type Adapter struct {
 }
 
 // Execute runs the adapter with the given instruction text. Agent stdout and
-// stderr tee to the terminal and to out, which must be safe for concurrent
-// use (the stdout and stderr copiers both write it). Returns the exit code; a
-// canceled context returns (-1, context.Canceled). Cancel kills the direct
-// child only — on Unix descendants of the agent may outlive it (tree-kill via
-// process group is left to callers), and on Windows killing is
-// direct-child-only by design. WaitDelay bounds the wait so orphaned
-// descendants holding the output pipes cannot hang Wait forever.
+// stderr are captured by out, which must be safe for concurrent use (the stdout
+// and stderr copiers both write it). Returns the exit code; a
+// canceled context returns (-1, context.Canceled). Cancel kills the process
+// group on Unix and the direct child on Windows. WaitDelay bounds the wait so
+// orphaned descendants holding the output pipes cannot hang Wait forever.
 func (a Adapter) Execute(ctx context.Context, prompt, specPath string, out io.Writer) (int, error) {
 	cmd, stdin, err := Build(a.Command, a.Delivery, prompt, specPath)
 	if err != nil {
@@ -107,12 +105,13 @@ func (a Adapter) Execute(ctx context.Context, prompt, specPath string, out io.Wr
 	}
 	cmd.Dir = a.Dir
 	cmd.Env = append(os.Environ(), a.Env...)
+	configureProcess(cmd)
 	cmd.WaitDelay = 5 * time.Second
 	if stdin != nil {
 		cmd.Stdin = bytes.NewReader(stdin)
 	}
-	cmd.Stdout = io.MultiWriter(os.Stdout, out)
-	cmd.Stderr = io.MultiWriter(os.Stderr, out)
+	cmd.Stdout = out
+	cmd.Stderr = out
 	if err := cmd.Start(); err != nil {
 		return -1, fmt.Errorf("agent: %w", err)
 	}
@@ -132,7 +131,7 @@ func (a Adapter) Execute(ctx context.Context, prompt, specPath string, out io.Wr
 		}
 		return -1, fmt.Errorf("agent: %w", err)
 	case <-ctx.Done():
-		_ = cmd.Process.Kill()
+		_ = killProcess(cmd)
 		<-done
 		return -1, ctx.Err()
 	}

@@ -97,7 +97,7 @@ func TestLogAppliesRendering(t *testing.T) {
 		t.Fatalf("log = %d, %s | %s", code, out.String(), errOut.String())
 	}
 	s := out.String()
-	for _, want := range []string{"applies:", "#1  v1  " + fakeBin + "  exit 0", ".respex/logs/1-apply.log", "multi line"} {
+	for _, want := range []string{"applies:", "#1  v1  " + fakeBin + "  succeeded", ".respex/logs/1-apply.log", "multi line"} {
 		if !strings.Contains(s, want) {
 			t.Fatalf("log missing %q in:\n%s", want, s)
 		}

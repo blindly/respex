@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/blindly/respex/internal/state"
 )
 
 func TestRefineRewritesSpec(t *testing.T) {
@@ -31,6 +33,36 @@ func TestRefineRewritesSpec(t *testing.T) {
 	}
 }
 
+func TestRefineHistoryIsRepeatable(t *testing.T) {
+	root := setupProject(t)
+	writeSpec(t, root, "# same\n")
+	writeConfig(t, root, fmt.Sprintf("[agent]\ncommand = [%q, \"{{prompt}}\"]\n", fakeBin))
+	for range 2 {
+		if code := runRefine(nil, &bytes.Buffer{}, &bytes.Buffer{}); code != 0 {
+			t.Fatalf("refine exit = %d", code)
+		}
+	}
+	st, err := state.Open(filepath.Join(root, ".respex", "state.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	refines, err := st.ListRefines()
+	if err != nil || len(refines) != 2 {
+		t.Fatalf("refinements = %+v, %v", refines, err)
+	}
+	if refines[0].Outcome != "unchanged" || refines[1].Outcome != "unchanged" {
+		t.Fatalf("refinement outcomes = %+v", refines)
+	}
+	if string(refines[0].BeforeContent) != "# same\n" || string(refines[0].AfterContent) != "# same\n" {
+		t.Fatalf("refinement snapshots = %+v", refines[0])
+	}
+	var out, errOut bytes.Buffer
+	if code := runStatus(nil, &out, &errOut); code != 0 || !strings.Contains(out.String(), "refined:     2 times") {
+		t.Fatalf("status after refinements = %d, %s | %s", code, out.String(), errOut.String())
+	}
+}
+
 func TestRefineUnchangedReports(t *testing.T) {
 	root := setupProject(t)
 	writeSpec(t, root, "# same\n")
@@ -38,6 +70,20 @@ func TestRefineUnchangedReports(t *testing.T) {
 	var out, errOut bytes.Buffer
 	if code := runRefine(nil, &out, &errOut); code != 0 || !strings.Contains(out.String(), "spec unchanged") {
 		t.Fatalf("refine unchanged: %d, %s | %s", code, out.String(), errOut.String())
+	}
+}
+
+func TestRefineRejectsConcurrentOperation(t *testing.T) {
+	root := setupProject(t)
+	writeSpec(t, root, "# x\n")
+	lock, locked, err := tryApplyLock(filepath.Join(root, ".respex", "operation.lock"))
+	if err != nil || !locked {
+		t.Fatalf("lock = %v, %v", locked, err)
+	}
+	defer lock.Close()
+	var out, errOut bytes.Buffer
+	if code := runRefine(nil, &out, &errOut); code != 1 || !strings.Contains(errOut.String(), "already running") {
+		t.Fatalf("concurrent refine: %d, %s | %s", code, out.String(), errOut.String())
 	}
 }
 
@@ -71,6 +117,16 @@ func TestRefineCustomPrompt(t *testing.T) {
 	body, _ := os.ReadFile(marker)
 	if !strings.Contains(string(body), "CUSTOM "+filepath.Join(root, "SPEC.md")) {
 		t.Fatalf("marker prompt wrong: %q", body)
+	}
+}
+
+func TestRefineTimeout(t *testing.T) {
+	root := setupProject(t)
+	writeSpec(t, root, "# x\n")
+	writeConfig(t, root, fmt.Sprintf("agent_timeout = \"20ms\"\n[agent]\ncommand = [%q, \"-sleep\", \"5s\", \"{{prompt}}\"]\n", fakeBin))
+	var out, errOut bytes.Buffer
+	if code := runRefine(nil, &out, &errOut); code != 1 || !strings.Contains(errOut.String(), "refine timed out after 20ms") {
+		t.Fatalf("refine timeout: %d, %s | %s", code, out.String(), errOut.String())
 	}
 }
 

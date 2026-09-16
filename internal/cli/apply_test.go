@@ -125,6 +125,46 @@ func TestApplyLogSetupFailureStampsRow(t *testing.T) {
 	}
 }
 
+func TestApplyLock(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "operation.lock")
+	first, locked, err := tryApplyLock(path)
+	if err != nil || !locked {
+		t.Fatalf("first lock = %v, %v", locked, err)
+	}
+	second, locked, err := tryApplyLock(path)
+	if err != nil || locked || second != nil {
+		t.Fatalf("second lock = %v, %v", locked, err)
+	}
+	if err := first.Close(); err != nil {
+		t.Fatal(err)
+	}
+	third, locked, err := tryApplyLock(path)
+	if err != nil || !locked {
+		t.Fatalf("lock after release = %v, %v", locked, err)
+	}
+	third.Close()
+}
+
+func TestApplyTimeout(t *testing.T) {
+	root := setupProject(t)
+	writeSpec(t, root, "# one\n")
+	writeConfig(t, root, fmt.Sprintf("agent_timeout = \"20ms\"\n[agent]\ncommand = [%q, \"-sleep\", \"5s\", \"{{prompt}}\"]\n", fakeBin))
+	runCommit(nil, &bytes.Buffer{}, &bytes.Buffer{})
+	var out, errOut bytes.Buffer
+	if code := runApply(nil, &out, &errOut); code != 1 || !strings.Contains(errOut.String(), "timed out after 20ms") {
+		t.Fatalf("timed out apply: %d, %s | %s", code, out.String(), errOut.String())
+	}
+	st, err := state.Open(filepath.Join(root, ".respex", "state.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	unfinished, err := st.HasUnfinishedApply()
+	if err != nil || unfinished {
+		t.Fatalf("unfinished after timeout = %v, %v", unfinished, err)
+	}
+}
+
 func TestApplyWarnsOnUnfinishedRow(t *testing.T) {
 	root := setupProject(t)
 	writeSpec(t, root, "# one\n")

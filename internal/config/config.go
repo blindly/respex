@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	toml "github.com/pelletier/go-toml/v2"
 )
@@ -29,14 +30,23 @@ type Prompts struct {
 // Config is the root configuration schema: spec file, agent settings, and
 // prompt overrides.
 type Config struct {
-	Spec    string  `toml:"spec"`
-	Agent   Agent   `toml:"agent"`
-	Prompts Prompts `toml:"prompts"`
+	Spec         string        `toml:"spec"`
+	AgentTimeout time.Duration `toml:"-"`
+	Agent        Agent         `toml:"agent"`
+	Prompts      Prompts       `toml:"prompts"`
+}
+
+type fileConfig struct {
+	Spec         string  `toml:"spec"`
+	AgentTimeout string  `toml:"agent_timeout"`
+	ApplyTimeout string  `toml:"apply_timeout"`
+	Agent        Agent   `toml:"agent"`
+	Prompts      Prompts `toml:"prompts"`
 }
 
 // Defaults returns the built-in configuration.
 func Defaults() Config {
-	return Config{Spec: "SPEC.md", Agent: Agent{Delivery: "argv"}}
+	return Config{Spec: "SPEC.md", AgentTimeout: time.Hour, Agent: Agent{Delivery: "argv"}}
 }
 
 // Load merges global (optional) then project (optional) files over Defaults:
@@ -57,9 +67,20 @@ func Load(globalPath, projectPath string) (Config, error) {
 		if err != nil {
 			return Config{}, fmt.Errorf("read config %s: %w", p, err)
 		}
-		var c Config
-		if err := toml.NewDecoder(bytes.NewReader(b)).DisallowUnknownFields().Decode(&c); err != nil {
+		var raw fileConfig
+		if err := toml.NewDecoder(bytes.NewReader(b)).DisallowUnknownFields().Decode(&raw); err != nil {
 			return Config{}, fmt.Errorf("parse config %s: %w", p, err)
+		}
+		c := Config{Spec: raw.Spec, Agent: raw.Agent, Prompts: raw.Prompts}
+		timeoutRaw := raw.AgentTimeout
+		if timeoutRaw == "" {
+			timeoutRaw = raw.ApplyTimeout
+		}
+		if timeoutRaw != "" {
+			c.AgentTimeout, err = time.ParseDuration(timeoutRaw)
+			if err != nil || c.AgentTimeout <= 0 {
+				return Config{}, fmt.Errorf("parse config %s: invalid agent timeout %q", p, timeoutRaw)
+			}
 		}
 		merge(&cfg, c)
 	}
@@ -69,6 +90,9 @@ func Load(globalPath, projectPath string) (Config, error) {
 func merge(dst *Config, src Config) {
 	if src.Spec != "" {
 		dst.Spec = src.Spec
+	}
+	if src.AgentTimeout > 0 {
+		dst.AgentTimeout = src.AgentTimeout
 	}
 	if len(src.Agent.Command) > 0 {
 		dst.Agent.Command = src.Agent.Command

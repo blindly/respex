@@ -20,9 +20,9 @@ func open(t *testing.T) *DB {
 	return d
 }
 
-func TestFreshOpenCreatesSchemaV1(t *testing.T) {
+func TestFreshOpenCreatesCurrentSchema(t *testing.T) {
 	d := open(t)
-	if v, err := d.SchemaVersion(); err != nil || v != 1 {
+	if v, err := d.SchemaVersion(); err != nil || v != 3 {
 		t.Fatalf("schema version = %d, %v", v, err)
 	}
 }
@@ -103,6 +103,43 @@ func TestLatestVersionNilWhenEmpty(t *testing.T) {
 	}
 }
 
+func TestMigrateLegacyDatabasePreservesHistory(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "state.db")
+	db, err := sql.Open("sqlite", "file:"+filepath.ToSlash(path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, stmt := range []string{
+		`CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`,
+		`INSERT INTO meta VALUES ('schema_version', '1')`,
+		`CREATE TABLE spec_versions (id INTEGER PRIMARY KEY AUTOINCREMENT, hash TEXT NOT NULL, content BLOB NOT NULL, committed_at TEXT NOT NULL, message TEXT)`,
+		`CREATE TABLE applies (id INTEGER PRIMARY KEY AUTOINCREMENT, version_id INTEGER NOT NULL REFERENCES spec_versions(id), agent TEXT NOT NULL, started_at TEXT NOT NULL, finished_at TEXT, exit_code INTEGER, log_path TEXT NOT NULL)`,
+		`CREATE INDEX idx_applies_version ON applies(version_id)`,
+		`INSERT INTO spec_versions VALUES (1, 'hash', X'73706563', '2026-01-01T00:00:00Z', NULL)`,
+		`INSERT INTO applies VALUES (1, 1, 'agent', '2026-01-01T00:00:00Z', NULL, NULL, '')`,
+	} {
+		if _, err := db.Exec(stmt); err != nil {
+			t.Fatal(err)
+		}
+	}
+	db.Close()
+	migrated, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer migrated.Close()
+	if version, err := migrated.SchemaVersion(); err != nil || version != 3 {
+		t.Fatalf("schema version = %d, %v", version, err)
+	}
+	applies, err := migrated.ListApplies()
+	if err != nil || len(applies) != 1 || applies[0].Outcome != "stale" {
+		t.Fatalf("migrated applies = %+v, %v", applies, err)
+	}
+	if _, err := migrated.InsertRefine("agent", "unchanged", "hash", "hash", []byte("spec"), []byte("spec"), "", time.Now(), time.Now()); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestMigrateCorruptSchemaVersion(t *testing.T) {
 	for _, tc := range []struct {
 		value string
@@ -147,8 +184,8 @@ func TestMigrateRollback(t *testing.T) {
 		return errors.New("boom")
 	})
 
-	if _, err := Open(p); err == nil || !strings.Contains(err.Error(), "migrate to v2") {
-		t.Fatalf("Open with failing migration: err = %v, want migrate to v2 error", err)
+	if _, err := Open(p); err == nil || !strings.Contains(err.Error(), "migrate to v4") {
+		t.Fatalf("Open with failing migration: err = %v, want migrate to v4 error", err)
 	}
 
 	migrations = orig
@@ -157,8 +194,8 @@ func TestMigrateRollback(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { d2.Close() })
-	if v, err := d2.SchemaVersion(); err != nil || v != 1 {
-		t.Fatalf("schema version after failed migration = %d, %v; want 1", v, err)
+	if v, err := d2.SchemaVersion(); err != nil || v != 3 {
+		t.Fatalf("schema version after failed migration = %d, %v; want 3", v, err)
 	}
 	var n int
 	if err := d2.db.QueryRow(`SELECT count(*) FROM sqlite_master

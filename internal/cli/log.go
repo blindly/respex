@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -33,6 +34,10 @@ func runLog(args []string, out, errOut io.Writer) int {
 	if err != nil {
 		return fail(errOut, err)
 	}
+	refines, err := st.ListRefines()
+	if err != nil {
+		return fail(errOut, err)
+	}
 
 	fmt.Fprintln(out, "versions:")
 	if len(versions) == 0 {
@@ -51,12 +56,16 @@ func runLog(args []string, out, errOut io.Writer) int {
 		fmt.Fprintln(out, "  (none)")
 	}
 	for _, a := range applies {
-		exit := "running"
-		if a.ExitCode != nil {
-			exit = fmt.Sprintf("exit %d", *a.ExitCode)
-		}
 		fmt.Fprintf(out, "  #%d  v%d  %s  %s  %s  %s\n", a.ID, a.VersionID, a.Agent,
-			exit, a.StartedAt.Format(time.RFC3339), a.LogPath)
+			a.Outcome, a.StartedAt.Format(time.RFC3339), a.LogPath)
+	}
+	fmt.Fprintln(out, "refinements:")
+	if len(refines) == 0 {
+		fmt.Fprintln(out, "  (none)")
+	}
+	for _, r := range refines {
+		fmt.Fprintf(out, "  #%d  %s  %s  %s  %s\n", r.ID, r.Agent, r.Outcome,
+			r.StartedAt.Format(time.RFC3339), r.LogPath)
 	}
 	return 0
 }
@@ -108,6 +117,39 @@ func runStatus(args []string, out, errOut io.Writer) int {
 	fmt.Fprintf(out, "dirty:       %s\n", dirty)
 	fmt.Fprintf(out, "last commit: %s\n", last)
 	fmt.Fprintf(out, "applied:     %s\n", applied)
+	applyState := "idle"
+	lock, locked, err := tryApplyLock(filepath.Join(w.root, ".respex", "operation.lock"))
+	if err != nil {
+		return fail(errOut, err)
+	}
+	if !locked {
+		unfinished, err := st.HasUnfinishedApply()
+		if err != nil {
+			return fail(errOut, err)
+		}
+		if unfinished {
+			applyState = "running"
+		} else {
+			applyState = "refine or restore running"
+		}
+	} else {
+		lock.Close()
+		if unfinished, err := st.HasUnfinishedApply(); err != nil {
+			return fail(errOut, err)
+		} else if unfinished {
+			applyState = "previous run ended unexpectedly"
+		}
+	}
+	fmt.Fprintf(out, "apply:       %s\n", applyState)
+	refines, err := st.ListRefines()
+	if err != nil {
+		return fail(errOut, err)
+	}
+	refined := "never"
+	if len(refines) > 0 {
+		refined = fmt.Sprintf("%d times; last %s at %s", len(refines), refines[0].Outcome, refines[0].StartedAt.Format(time.RFC3339))
+	}
+	fmt.Fprintf(out, "refined:     %s\n", refined)
 	agentLine := "(not configured)"
 	if len(w.cfg.Agent.Command) > 0 {
 		agentLine = w.cfg.Agent.Command[0] + " (configured)"

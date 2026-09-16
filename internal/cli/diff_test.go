@@ -2,6 +2,9 @@ package cli
 
 import (
 	"bytes"
+	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -34,6 +37,35 @@ func TestDiffTwoVersions(t *testing.T) {
 	var out, errOut bytes.Buffer
 	if code := runDiff([]string{"1", "2"}, &out, &errOut); code != 0 || !strings.Contains(out.String(), "+two") {
 		t.Fatalf("diff v1 v2: %d, %s", code, errOut.String())
+	}
+}
+
+func TestDiffAndRestoreRefinement(t *testing.T) {
+	root := setupProject(t)
+	writeSpec(t, root, "# before\n")
+	writeConfig(t, root, fmt.Sprintf("[agent]\ncommand = [%q, \"-write\", \"{{spec_path}}\", \"-content\", \"# after\\n\", \"{{prompt}}\"]\n", fakeBin))
+	if code := runRefine(nil, &bytes.Buffer{}, &bytes.Buffer{}); code != 0 {
+		t.Fatalf("refine exit = %d", code)
+	}
+	var out, errOut bytes.Buffer
+	if code := runDiff([]string{"--refine", "latest"}, &out, &errOut); code != 0 || !strings.Contains(out.String(), "-# before") || !strings.Contains(out.String(), "+# after") {
+		t.Fatalf("refine diff = %d, %s | %s", code, out.String(), errOut.String())
+	}
+	out.Reset()
+	errOut.Reset()
+	if code := runRestore([]string{"--refine", "latest", "--before"}, &out, &errOut); code != 0 {
+		t.Fatalf("restore = %d, %s | %s", code, out.String(), errOut.String())
+	}
+	content, err := os.ReadFile(filepath.Join(root, "SPEC.md"))
+	if err != nil || string(content) != "# before\n" {
+		t.Fatalf("restored content = %q, %v", content, err)
+	}
+	if code := runRestore([]string{"--refine", "latest", "--before"}, &out, &errOut); code != 0 {
+		t.Fatalf("reverse restore = %d, %s | %s", code, out.String(), errOut.String())
+	}
+	content, err = os.ReadFile(filepath.Join(root, "SPEC.md"))
+	if err != nil || string(content) != "# after\n" {
+		t.Fatalf("reverse restored content = %q, %v", content, err)
 	}
 }
 

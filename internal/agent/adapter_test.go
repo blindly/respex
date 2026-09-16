@@ -129,7 +129,7 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func TestExecuteSuccessTeesOutput(t *testing.T) {
+func TestExecuteSuccessCapturesOutput(t *testing.T) {
 	dir := t.TempDir()
 	marker := filepath.Join(dir, "marker")
 	log := &bytes.Buffer{}
@@ -147,7 +147,7 @@ func TestExecuteSuccessTeesOutput(t *testing.T) {
 		t.Fatalf("marker = %q", got)
 	}
 	if !strings.Contains(log.String(), "hello agent") {
-		t.Fatalf("tee log missing prompt: %q", log.String())
+		t.Fatalf("captured output missing prompt: %q", log.String())
 	}
 }
 
