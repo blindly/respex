@@ -8,5 +8,14 @@ builds:
     main: .
     ldflags:
       - -s -w -X respex/internal/cli.version={{.Version}}
+archives:
+  - formats: [binary]
+    name_template: >-
+      {{ .Binary }}_
+      {{ .Version }}_
+      {{ .Os }}_
+      {{ .Arch }}
+      {{- if eq .Os "windows" }}.exe{{ end }}
+
 checksum:
   name_template: checksums.txt
