@@ -90,13 +90,17 @@ func merge(dst *Config, src Config) {
 	}
 }
 
-// GlobalPath returns the user-level config path: os.UserConfigDir honors
-// XDG_CONFIG_HOME on Unix (typically ~/.config/respex/config.toml), %AppData%
-// on Windows, and ~/Library/Application Support on macOS.
+// GlobalPath returns the user-level config path. XDG_CONFIG_HOME is honored
+// when set (including on macOS); otherwise os.UserConfigDir is used, which
+// gives %AppData% on Windows and ~/Library/Application Support on macOS.
 func GlobalPath() (string, error) {
-	dir, err := os.UserConfigDir()
-	if err != nil {
-		return "", err
+	dir := os.Getenv("XDG_CONFIG_HOME")
+	if dir == "" {
+		var err error
+		dir, err = os.UserConfigDir()
+		if err != nil {
+			return "", err
+		}
 	}
 	return filepath.Join(dir, "respex", "config.toml"), nil
 }
