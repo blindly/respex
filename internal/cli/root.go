@@ -37,6 +37,8 @@ var commands = map[string]func(args []string, out, errOut io.Writer) int{
 	"restore": runRestore,
 	"config":  runConfig,
 	"edit":    runEdit,
+	"update":  runUpdate,
+	"doctor":  runDoctor,
 }
 
 func usage(w io.Writer) {
@@ -55,7 +57,9 @@ Commands:
   log        show versions and applies
   status     summarize spec and state
   restore    restore a saved refinement before-state
-  config     initialize or locate the user-level config
+  config     initialize, edit, validate, or show configuration
+  update     securely update the respex binary
+  doctor     diagnose configuration and project health
 `)
 }
 

@@ -10,19 +10,51 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/blindly/respex/internal/spec"
 )
+
+func splitEditor(value string) ([]string, error) {
+	var args []string
+	var current strings.Builder
+	var quote rune
+	for _, r := range value {
+		switch {
+		case quote != 0 && r == quote:
+			quote = 0
+		case quote == 0 && (r == '\'' || r == '"'):
+			quote = r
+		case quote == 0 && (r == ' ' || r == '\t'):
+			if current.Len() > 0 {
+				args = append(args, current.String())
+				current.Reset()
+			}
+		default:
+			current.WriteRune(r)
+		}
+	}
+	if quote != 0 {
+		return nil, errors.New("editor environment variable has an unclosed quote")
+	}
+	if current.Len() > 0 {
+		args = append(args, current.String())
+	}
+	if len(args) == 0 {
+		return nil, errors.New("editor command is empty")
+	}
+	return args, nil
+}
 
 func resolveEditor(configured []string) ([]string, error) {
 	if len(configured) > 0 {
 		return configured, nil
 	}
 	if visual := os.Getenv("VISUAL"); visual != "" {
-		return []string{visual}, nil
+		return splitEditor(visual)
 	}
 	if editor := os.Getenv("EDITOR"); editor != "" {
-		return []string{editor}, nil
+		return splitEditor(editor)
 	}
 	if runtime.GOOS == "windows" {
 		return []string{"notepad"}, nil

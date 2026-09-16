@@ -2,9 +2,11 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
 	"time"
@@ -13,6 +15,7 @@ import (
 	"github.com/blindly/respex/internal/config"
 	"github.com/blindly/respex/internal/spec"
 	"github.com/blindly/respex/internal/state"
+	"github.com/blindly/respex/internal/ui"
 )
 
 const configTemplate = `# respex configuration
@@ -42,12 +45,17 @@ const configTemplate = `# respex configuration
 `
 
 func runNew(args []string, out, errOut io.Writer) int {
-	if len(args) > 1 {
-		return fail(errOut, fmt.Errorf("usage: respex new [description]"))
+	fs := newFlagSet("new", errOut)
+	noProgress := fs.Bool("no-progress", false, "disable the interactive progress indicator")
+	if err := fs.Parse(args); err != nil {
+		return fail(errOut, err)
+	}
+	if fs.NArg() > 1 {
+		return fail(errOut, fmt.Errorf("usage: respex new [--no-progress] [description]"))
 	}
 	desc := ""
-	if len(args) == 1 {
-		desc = args[0]
+	if fs.NArg() == 1 {
+		desc = fs.Arg(0)
 	}
 	if _, err := os.Stat(filepath.Join(".respex", "state.db")); err == nil {
 		return fail(errOut, fmt.Errorf("this directory is already a respex project (.respex/state.db exists) — delete .respex/ and the spec file to re-initialize"))
@@ -81,7 +89,7 @@ func runNew(args []string, out, errOut io.Writer) int {
 
 	switch {
 	case desc != "" && len(cfg.Agent.Command) > 0:
-		if code := draftSpec(cfg, desc, cfg.Spec, out, errOut); code != 0 {
+		if code := draftSpec(cfg, desc, cfg.Spec, *noProgress, out, errOut); code != 0 {
 			return code
 		}
 		fmt.Fprintln(out, "edit the spec, then run `respex commit` before `respex apply`")
@@ -100,7 +108,7 @@ func runNew(args []string, out, errOut io.Writer) int {
 }
 
 // draftSpec runs the agent to write the spec file from a description.
-func draftSpec(cfg config.Config, desc, specRel string, out, errOut io.Writer) int {
+func draftSpec(cfg config.Config, desc, specRel string, noProgress bool, out, errOut io.Writer) int {
 	delivery := cfg.Agent.Delivery
 	if delivery == "" {
 		delivery = agent.DeliveryArgv
@@ -124,8 +132,25 @@ func draftSpec(cfg config.Config, desc, specRel string, out, errOut io.Writer) i
 	if cfg.Prompts.Draft != "" {
 		tmpl = cfg.Prompts.Draft
 	}
-	code, err := a.Execute(context.Background(), agent.Expand(tmpl, desc, abs), abs, f)
+	label := fmt.Sprintf("drafting %s via %s", specRel, cfg.Agent.Command[0])
+	progressEnabled := ui.IsTTY(out) && !noProgress && os.Getenv("NO_COLOR") == ""
+	if !progressEnabled {
+		fmt.Fprintf(out, "%s; output: %s\n", label, logPath)
+	}
+	progress := ui.StartProgress(out, label, progressEnabled)
+	signalCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+	ctx, cancel := context.WithTimeout(signalCtx, cfg.AgentTimeout)
+	defer cancel()
+	code, err := a.Execute(ctx, agent.Expand(tmpl, desc, abs), abs, f)
+	progress.Stop()
 	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return fail(errOut, fmt.Errorf("draft timed out after %s — log: %s", cfg.AgentTimeout, logPath))
+		}
+		if errors.Is(err, context.Canceled) {
+			return fail(errOut, fmt.Errorf("draft interrupted — log: %s", logPath))
+		}
 		return fail(errOut, err)
 	}
 	if code != 0 {

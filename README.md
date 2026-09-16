@@ -49,8 +49,12 @@ saved refinement snapshot.
 Create a user-level template and inspect its location with:
 
 ```text
-respex config init
-respex config path
+respex config init                 # create user config
+respex config edit                 # edit user config
+respex config path                 # print user config path
+respex config edit --local         # edit this project's overrides
+respex config validate --local     # validate the merged project config
+respex config show                 # show effective values and their sources
 ```
 
 The user config provides defaults for every project. `.respex/config.toml`
@@ -82,9 +86,11 @@ Other user-level settings continue to be inherited. Placeholders: `{{prompt}}`
 (instruction text) and `{{spec_path}}` (spec file path).
 Agent CLIs must use their non-interactive mode; for Devin CLI, use
 `command = ["devin", "--print", "{{prompt}}"]`. Success = exit code 0. Run
-output is captured under `.respex/logs/`. The timeout
-applies to both refine and apply. Only one apply, refine, or restore can run per
-project; the lock is released automatically when Respex exits.
+output is captured under `.respex/logs/`. Interactive terminals show an elapsed
+time spinner during agent operations; use `--no-progress` or set `NO_COLOR` to
+disable it. The timeout applies to drafting, refine, and apply. Only one apply,
+refine, restore, or edit can run per project; the lock is released automatically
+when Respex exits.
 
 ## State
 
@@ -105,6 +111,18 @@ to another machine. Commit important spec changes to Git.
 
 On Linux and macOS, cancellation terminates the agent process group. On Windows,
 only the direct agent process is terminated, so descendants may need manual cleanup.
+
+## Maintenance
+
+```text
+respex update --check              # check the latest GitHub release
+respex update                      # verify checksum and replace this binary
+respex update --version v0.1.1     # install a specific release
+respex doctor                      # diagnose config, tools, state, and locks
+```
+
+Updates are installed only after the downloaded binary matches the release's
+`checksums.txt`. A failed download or checksum leaves the executable unchanged.
 
 ## Manual smoke test (per agent CLI)
 

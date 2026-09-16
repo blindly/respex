@@ -14,16 +14,18 @@ import (
 
 	"github.com/blindly/respex/internal/agent"
 	"github.com/blindly/respex/internal/spec"
+	"github.com/blindly/respex/internal/ui"
 )
 
 func runApply(args []string, out, errOut io.Writer) int {
 	fs := newFlagSet("apply", errOut)
 	oneOff := fs.String("agent", "", `one-off adapter in TOML array form: --agent '["gemini", "-p", "{{prompt}}"]' (delivery mode is inherited from config)`)
+	noProgress := fs.Bool("no-progress", false, "disable the interactive progress indicator")
 	if err := fs.Parse(args); err != nil {
 		return fail(errOut, err)
 	}
 	if fs.NArg() != 0 {
-		return fail(errOut, fmt.Errorf("unexpected argument %q — usage: respex apply [--agent tpl]", fs.Arg(0)))
+		return fail(errOut, fmt.Errorf("unexpected argument %q — usage: respex apply [--agent tpl] [--no-progress]", fs.Arg(0)))
 	}
 
 	w, err := discover()
@@ -126,13 +128,19 @@ func runApply(args []string, out, errOut io.Writer) int {
 	}
 	defer f.Close()
 
-	fmt.Fprintf(out, "applying v%d via %s; output: %s\n", last.ID, tpl[0], logRel)
+	label := fmt.Sprintf("applying v%d via %s", last.ID, tpl[0])
+	progressEnabled := ui.IsTTY(out) && !*noProgress && os.Getenv("NO_COLOR") == ""
+	if !progressEnabled {
+		fmt.Fprintf(out, "%s; output: %s\n", label, logRel)
+	}
+	progress := ui.StartProgress(out, label, progressEnabled)
 	start := time.Now()
 	signalCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 	ctx, cancel := context.WithTimeout(signalCtx, w.cfg.AgentTimeout)
 	defer cancel()
 	code, err := a.Execute(ctx, instr, absSpec, f)
+	progress.Stop()
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
 			if ferr := st.FinishApplyWithOutcome(id, -1, "timed_out", time.Now()); ferr != nil {

@@ -12,11 +12,17 @@ import (
 
 	"github.com/blindly/respex/internal/agent"
 	"github.com/blindly/respex/internal/spec"
+	"github.com/blindly/respex/internal/ui"
 )
 
 func runRefine(args []string, out, errOut io.Writer) int {
-	if len(args) != 0 {
-		return fail(errOut, fmt.Errorf("unexpected argument %q — usage: respex refine", args[0]))
+	fs := newFlagSet("refine", errOut)
+	noProgress := fs.Bool("no-progress", false, "disable the interactive progress indicator")
+	if err := fs.Parse(args); err != nil {
+		return fail(errOut, err)
+	}
+	if fs.NArg() != 0 {
+		return fail(errOut, fmt.Errorf("unexpected argument %q — usage: respex refine [--no-progress]", fs.Arg(0)))
 	}
 	w, err := discover()
 	if err != nil {
@@ -77,11 +83,18 @@ func runRefine(args []string, out, errOut io.Writer) int {
 		tmpl = w.cfg.Prompts.Refine
 	}
 	absSpec := w.absSpecPath()
+	label := fmt.Sprintf("refining via %s", name)
+	progressEnabled := ui.IsTTY(out) && !*noProgress && os.Getenv("NO_COLOR") == ""
+	if !progressEnabled {
+		fmt.Fprintf(out, "%s; output: %s\n", label, logRel)
+	}
+	progress := ui.StartProgress(out, label, progressEnabled)
 	signalCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 	ctx, cancel := context.WithTimeout(signalCtx, w.cfg.AgentTimeout)
 	defer cancel()
 	code, err := a.Execute(ctx, agent.Expand(tmpl, "", absSpec), absSpec, f)
+	progress.Stop()
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
 			if rerr := record("timed_out", beforeHash, before); rerr != nil {

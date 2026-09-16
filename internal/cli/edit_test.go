@@ -16,8 +16,9 @@ func TestResolveEditorPrecedence(t *testing.T) {
 	if err != nil || strings.Join(editor, " ") != "configured-editor --wait" {
 		t.Fatalf("configured editor = %v, %v", editor, err)
 	}
+	t.Setenv("VISUAL", `"visual editor" --wait`)
 	editor, err = resolveEditor(nil)
-	if err != nil || len(editor) != 1 || editor[0] != "visual-editor" {
+	if err != nil || len(editor) != 2 || editor[0] != "visual editor" || editor[1] != "--wait" {
 		t.Fatalf("visual editor = %v, %v", editor, err)
 	}
 	t.Setenv("VISUAL", "")

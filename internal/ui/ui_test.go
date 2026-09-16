@@ -1,8 +1,11 @@
 package ui
 
 import (
+	"bytes"
 	"io"
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestColorizeDiff(t *testing.T) {
@@ -27,6 +30,26 @@ func TestColorizeDiffCommaHunk(t *testing.T) {
 func TestColorizeDiffEmpty(t *testing.T) {
 	if got := ColorizeDiff(""); got != "" {
 		t.Fatalf("ColorizeDiff(empty) = %q, want empty", got)
+	}
+}
+
+func TestProgress(t *testing.T) {
+	var out bytes.Buffer
+	progress := StartProgress(&out, "applying v1", true)
+	time.Sleep(120 * time.Millisecond)
+	progress.Stop()
+	progress.Stop()
+	if text := out.String(); !strings.Contains(text, "applying v1") || !strings.Contains(text, "\r") {
+		t.Fatalf("progress output = %q", text)
+	}
+}
+
+func TestProgressDisabled(t *testing.T) {
+	var out bytes.Buffer
+	progress := StartProgress(&out, "applying v1", false)
+	progress.Stop()
+	if out.Len() != 0 {
+		t.Fatalf("disabled progress output = %q", out.String())
 	}
 }
 
