@@ -35,6 +35,7 @@ var commands = map[string]func(args []string, out, errOut io.Writer) int{
 	"log":     runLog,
 	"status":  runStatus,
 	"restore": runRestore,
+	"config":  runConfig,
 }
 
 func usage(w io.Writer) {
@@ -52,6 +53,7 @@ Commands:
   log        show versions and applies
   status     summarize spec and state
   restore    restore a saved refinement before-state
+  config     initialize or locate the user-level config
 `)
 }
 

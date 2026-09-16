@@ -45,7 +45,15 @@ saved refinement snapshot.
 
 ## Configuration
 
-`.respex/config.toml` (project) overrides `~/.config/respex/config.toml` (user):
+Create a user-level template and inspect its location with:
+
+```text
+respex config init
+respex config path
+```
+
+The user config provides defaults for every project. `.respex/config.toml`
+(project) overrides `~/.config/respex/config.toml` (user) key by key:
 
 ```toml
 spec = "SPEC.md"
@@ -57,7 +65,16 @@ delivery = "argv"                          # or "stdin" for long prompts
 env = []
 ```
 
-Placeholders: `{{prompt}}` (instruction text), `{{spec_path}}` (spec file path).
+For example, a user-level Devin command can be replaced in one project by
+putting only this in `.respex/config.toml`:
+
+```toml
+[agent]
+command = ["claude", "-p", "{{prompt}}"]
+```
+
+Other user-level settings continue to be inherited. Placeholders: `{{prompt}}`
+(instruction text) and `{{spec_path}}` (spec file path).
 Agent CLIs must use their non-interactive mode; for Devin CLI, use
 `command = ["devin", "--print", "{{prompt}}"]`. Success = exit code 0. Run
 output is captured under `.respex/logs/`. The timeout

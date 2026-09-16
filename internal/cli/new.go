@@ -21,9 +21,14 @@ const configTemplate = `# respex configuration
 # Add keys inside the tables below — do not redeclare [agent] or [prompts].
 
 [agent]
-# Required before refine/apply: the agent CLI, as an argv array.
+# Required before refine/apply: choose one non-interactive agent command.
+# Project config overrides this command when the same key is defined locally.
 # Placeholders: {{prompt}} = instruction text, {{spec_path}} = spec file path.
 # command = ["claude", "-p", "{{prompt}}"]
+# command = ["devin", "--print", "{{prompt}}"]
+# command = ["codex", "exec", "{{prompt}}"]
+# command = ["gemini", "-p", "{{prompt}}"]
+# command = ["opencode", "run", "{{prompt}}"]
 # delivery = "argv"            # or "stdin": pipe the prompt, omit {{prompt}}
 # env = []
 
