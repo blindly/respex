@@ -7,8 +7,8 @@ import (
 
 	difflib "github.com/pmezard/go-difflib/difflib"
 
-	"respex/internal/spec"
-	"respex/internal/ui"
+	"github.com/blindly/respex/internal/spec"
+	"github.com/blindly/respex/internal/ui"
 )
 
 func runDiff(args []string, out, errOut io.Writer) int {

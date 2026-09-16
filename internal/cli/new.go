@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"respex/internal/agent"
-	"respex/internal/config"
-	"respex/internal/spec"
-	"respex/internal/state"
+	"github.com/blindly/respex/internal/agent"
+	"github.com/blindly/respex/internal/config"
+	"github.com/blindly/respex/internal/spec"
+	"github.com/blindly/respex/internal/state"
 )
 
 const configTemplate = `# respex configuration

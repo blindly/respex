@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"respex/internal/agent"
-	"respex/internal/spec"
+	"github.com/blindly/respex/internal/agent"
+	"github.com/blindly/respex/internal/spec"
 )
 
 func runRefine(args []string, out, errOut io.Writer) int {

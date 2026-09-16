@@ -1,4 +1,4 @@
-module respex
+module github.com/blindly/respex
 
 go 1.24.0
 

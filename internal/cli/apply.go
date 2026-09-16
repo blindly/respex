@@ -12,8 +12,8 @@ import (
 
 	toml "github.com/pelletier/go-toml/v2"
 
-	"respex/internal/agent"
-	"respex/internal/spec"
+	"github.com/blindly/respex/internal/agent"
+	"github.com/blindly/respex/internal/spec"
 )
 
 func runApply(args []string, out, errOut io.Writer) int {

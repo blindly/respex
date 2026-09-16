@@ -11,9 +11,65 @@ The spec is the durable source of truth; the codebase converges to it.
 
 ## Install
 
-Download a binary from [Releases](../../releases) (linux/darwin/windows, amd64/arm64),
-or build from source: `go install github.com/YOU/respex@latest`
-(`YOU` is a placeholder — swap in the actual GitHub owner once the repo is published).
+### macOS / Linux
+
+```bash
+TAG=$(curl -sSL https://api.github.com/repos/blindly/respex/releases/latest | grep '"tag_name":' | head -n1 | sed -E 's/.*"([^"]+)".*/\1/')
+OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+ARCH=$(uname -m)
+case "$ARCH" in x86_64) ARCH=amd64 ;; aarch64|arm64) ARCH=arm64 ;; esac
+case "$OS" in linux) OS=linux ;; darwin) OS=darwin ;; cygwin*|msys*|mingw*) OS=windows ;; esac
+URL="https://github.com/blindly/respex/releases/download/${TAG}/respex_${TAG}_${OS}_${ARCH}"
+tmp=$(mktemp)
+if curl -fsSL -o "$tmp" "${URL}.exe" 2>/dev/null; then
+  install "$tmp" "${HOME}/.local/bin/respex.exe"
+else
+  curl -fsSL -o "$tmp" "$URL"
+  install "$tmp" "${HOME}/.local/bin/respex"
+fi
+```
+
+Change the install destination (`${HOME}/.local/bin`) to `/usr/local/bin` or any
+other directory on your `PATH`.
+
+### Windows (PowerShell)
+
+```powershell
+$ErrorActionPreference = "Stop"
+$release = Invoke-RestMethod -Uri "https://api.github.com/repos/blindly/respex/releases/latest"
+$tag = $release.tag_name
+$arch = switch ($env:PROCESSOR_ARCHITECTURE) { "AMD64" { "amd64" } "ARM64" { "arm64" } }
+$base = "https://github.com/blindly/respex/releases/download/${tag}/respex_${tag}_windows_${arch}"
+$tmp = New-TemporaryFile
+try {
+    Invoke-RestMethod -Uri "${base}.exe" -OutFile "$($tmp.FullName).exe"
+    Copy-Item "$($tmp.FullName).exe" "$env:LOCALAPPDATA\Microsoft\WindowsApps\respex.exe" -Force
+} catch {
+    Invoke-RestMethod -Uri "$base" -OutFile $tmp.FullName
+    Copy-Item $tmp.FullName "$env:LOCALAPPDATA\Microsoft\WindowsApps\respex.exe" -Force
+}
+```
+
+### Go install
+
+If you have Go installed:
+
+```bash
+go install github.com/blindly/respex@latest
+```
+
+### Manual
+
+Download a binary from [Releases](../../releases) (linux/darwin/windows,
+amd64/arm64).
+
+### Build from source
+
+```bash
+git clone https://github.com/blindly/respex.git
+cd respex
+go build .
+```
 
 ## Quick start
 

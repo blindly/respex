@@ -7,9 +7,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"respex/internal/agent"
-	"respex/internal/config"
-	"respex/internal/state"
+	"github.com/blindly/respex/internal/agent"
+	"github.com/blindly/respex/internal/config"
+	"github.com/blindly/respex/internal/state"
 )
 
 // workspace is the resolved environment for a command.

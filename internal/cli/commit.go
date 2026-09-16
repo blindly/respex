@@ -5,7 +5,7 @@ import (
 	"io"
 	"time"
 
-	"respex/internal/spec"
+	"github.com/blindly/respex/internal/spec"
 )
 
 func runCommit(args []string, out, errOut io.Writer) int {

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"respex/internal/spec"
+	"github.com/blindly/respex/internal/spec"
 )
 
 func runLog(args []string, out, errOut io.Writer) int {

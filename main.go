@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"respex/internal/cli"
+	"github.com/blindly/respex/internal/cli"
 )
 
 func main() {

@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"respex/internal/state"
+	"github.com/blindly/respex/internal/state"
 )
 
 func TestApplyDirtySpecFails(t *testing.T) {
