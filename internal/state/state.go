@@ -35,11 +35,11 @@ type Apply struct {
 }
 
 type Refine struct {
-	ID         int64
-	Agent      string
-	StartedAt  time.Time
-	FinishedAt time.Time
-	Outcome    string
+	ID            int64
+	Agent         string
+	StartedAt     time.Time
+	FinishedAt    time.Time
+	Outcome       string
 	BeforeHash    string
 	AfterHash     string
 	BeforeContent []byte

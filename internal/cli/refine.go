@@ -65,6 +65,9 @@ func runRefine(args []string, out, errOut io.Writer) int {
 	logRel := filepath.Join(".respex", "logs", filepath.Base(logPath))
 	started := time.Now()
 	record := func(outcome, afterHash string, after []byte) error {
+		if after == nil {
+			after = []byte{}
+		}
 		_, err := st.InsertRefine(name, outcome, beforeHash, afterHash, before, after, logRel, started, time.Now())
 		return err
 	}
