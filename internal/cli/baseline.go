@@ -54,6 +54,11 @@ func runBaseline(args []string, out, errOut io.Writer) int {
 		return fail(errOut, err)
 	}
 	defer st.Close()
+	candidatePath, cleanupCandidate, err := createSpecCandidate(w.root, before)
+	if err != nil {
+		return fail(errOut, err)
+	}
+	defer cleanupCandidate()
 	logsDir := filepath.Join(w.root, ".respex", "logs")
 	if err := os.MkdirAll(logsDir, 0o755); err != nil {
 		return fail(errOut, err)
@@ -84,7 +89,7 @@ func runBaseline(args []string, out, errOut io.Writer) int {
 	if *merge {
 		tmpl += "\n\nMerge findings into the existing specification. Preserve established user intent and explicitly documented requirements unless they directly contradict observed behavior; record conflicts in Open Questions."
 	}
-	absSpec := w.absSpecPath()
+	absSpec := candidatePath
 	label := fmt.Sprintf("baselining repository via %s", name)
 	progressEnabled := ui.IsTTY(out) && !*noProgress && os.Getenv("NO_COLOR") == ""
 	if !progressEnabled {
@@ -115,13 +120,15 @@ func runBaseline(args []string, out, errOut io.Writer) int {
 		}
 		return fail(errOut, fmt.Errorf("baseline failed (exit %d) — log: %s", code, logPath))
 	}
-	after, err := spec.Read(w.specPath())
+	after, err := installSpecCandidate(w.specPath(), candidatePath, before)
 	if err != nil {
-		if rerr := record("failed", nil); rerr != nil {
+		candidate, _ := os.ReadFile(candidatePath)
+		if rerr := record("failed", candidate); rerr != nil {
 			return fail(errOut, rerr)
 		}
-		return fail(errOut, fmt.Errorf("agent removed the spec — log: %s: %w", logPath, err))
+		return fail(errOut, fmt.Errorf("install baseline spec — log: %s: %w", logPath, err))
 	}
+	warnMissingSections(out, after)
 	outcome := "generated"
 	if spec.Hash(before) == spec.Hash(after) {
 		outcome = "unchanged"

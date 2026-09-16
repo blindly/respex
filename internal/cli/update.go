@@ -142,19 +142,22 @@ func installUpdate(content []byte) error {
 
 func runUpdate(args []string, out, errOut io.Writer) int {
 	check := false
+	jsonOutput := false
 	requested := ""
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--check":
 			check = true
+		case "--json":
+			jsonOutput = true
 		case "--version":
 			if i+1 >= len(args) {
-				return fail(errOut, errors.New("usage: respex update [--check] [--version tag]"))
+				return fail(errOut, errors.New("usage: respex update [--check] [--json] [--version tag]"))
 			}
 			i++
 			requested = args[i]
 		default:
-			return fail(errOut, errors.New("usage: respex update [--check] [--version tag]"))
+			return fail(errOut, errors.New("usage: respex update [--check] [--json] [--version tag]"))
 		}
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
@@ -164,11 +167,23 @@ func runUpdate(args []string, out, errOut io.Writer) int {
 		return fail(errOut, err)
 	}
 	if release.Tag == version {
-		fmt.Fprintf(out, "respex %s is already current\n", version)
+		if jsonOutput {
+			if err := json.NewEncoder(out).Encode(map[string]any{"current": version, "latest": release.Tag, "update_available": false}); err != nil {
+				return fail(errOut, err)
+			}
+		} else {
+			fmt.Fprintf(out, "respex %s is already current\n", version)
+		}
 		return 0
 	}
 	if check {
-		fmt.Fprintf(out, "update available: %s → %s\n", version, release.Tag)
+		if jsonOutput {
+			if err := json.NewEncoder(out).Encode(map[string]any{"current": version, "latest": release.Tag, "update_available": true}); err != nil {
+				return fail(errOut, err)
+			}
+		} else {
+			fmt.Fprintf(out, "update available: %s → %s\n", version, release.Tag)
+		}
 		return 0
 	}
 	binary, checksums, err := releaseDownloads(release)
@@ -194,6 +209,12 @@ func runUpdate(args []string, out, errOut io.Writer) int {
 	if err := installUpdate(content); err != nil {
 		return fail(errOut, err)
 	}
-	fmt.Fprintf(out, "updated respex %s → %s\n", version, release.Tag)
+	if jsonOutput {
+		if err := json.NewEncoder(out).Encode(map[string]any{"previous": version, "current": release.Tag, "updated": true}); err != nil {
+			return fail(errOut, err)
+		}
+	} else {
+		fmt.Fprintf(out, "updated respex %s → %s\n", version, release.Tag)
+	}
 	return 0
 }

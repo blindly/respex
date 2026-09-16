@@ -60,6 +60,11 @@ func runRefine(args []string, out, errOut io.Writer) int {
 		return fail(errOut, err)
 	}
 	defer st.Close()
+	candidatePath, cleanupCandidate, err := createSpecCandidate(w.root, before)
+	if err != nil {
+		return fail(errOut, err)
+	}
+	defer cleanupCandidate()
 	last, err := st.LatestVersion()
 	if err != nil {
 		return fail(errOut, err)
@@ -103,7 +108,7 @@ func runRefine(args []string, out, errOut io.Writer) int {
 		_ = os.Remove(logPath)
 		return fail(errOut, errors.New("this exact spec, prompt, and agent configuration was last refined unchanged — edit the spec or use `respex refine --force`"))
 	}
-	absSpec := w.absSpecPath()
+	absSpec := candidatePath
 	label := fmt.Sprintf("refining via %s", name)
 	progressEnabled := ui.IsTTY(out) && !*noProgress && os.Getenv("NO_COLOR") == ""
 	if !progressEnabled {
@@ -141,13 +146,15 @@ func runRefine(args []string, out, errOut io.Writer) int {
 		}
 		return fail(errOut, fmt.Errorf("refine failed (exit %d) — log: %s", code, logPath))
 	}
-	after, err := spec.Read(w.specPath())
+	after, err := installSpecCandidate(w.specPath(), candidatePath, before)
 	if err != nil {
-		if rerr := record("failed", "", nil); rerr != nil {
+		candidate, _ := os.ReadFile(candidatePath)
+		if rerr := record("failed", "", candidate); rerr != nil {
 			return fail(errOut, rerr)
 		}
-		return fail(errOut, fmt.Errorf("agent removed the spec — log: %s: %w", logPath, err))
+		return fail(errOut, fmt.Errorf("install refined spec — log: %s: %w", logPath, err))
 	}
+	warnMissingSections(out, after)
 	afterHash := spec.Hash(after)
 	if afterHash == beforeHash {
 		if err := record("unchanged", afterHash, after); err != nil {

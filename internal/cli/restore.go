@@ -3,7 +3,6 @@ package cli
 import (
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"strconv"
 	"time"
@@ -12,9 +11,10 @@ import (
 )
 
 func runRestore(args []string, out, errOut io.Writer) int {
-	if len(args) != 3 || args[0] != "--refine" || args[2] != "--before" {
-		return fail(errOut, fmt.Errorf("usage: respex restore --refine <id|latest> --before"))
+	if len(args) != 3 || (args[0] != "--refine" && args[0] != "--baseline") || args[2] != "--before" {
+		return fail(errOut, fmt.Errorf("usage: respex restore <--refine|--baseline> <id|latest> --before"))
 	}
+	kind := args[0][2:]
 	w, err := discover()
 	if err != nil {
 		return fail(errOut, err)
@@ -32,44 +32,75 @@ func runRestore(args []string, out, errOut io.Writer) int {
 		return fail(errOut, err)
 	}
 	defer st.Close()
-	var refinementID int64
+	var id int64
+	var before []byte
 	if args[1] == "latest" {
-		r, err := st.LatestRefine()
-		if err != nil {
-			return fail(errOut, err)
+		if kind == "refine" {
+			r, err := st.LatestRefine()
+			if err != nil {
+				return fail(errOut, err)
+			}
+			if r == nil {
+				return fail(errOut, fmt.Errorf("no refinements yet"))
+			}
+			id, before = r.ID, r.BeforeContent
+		} else {
+			b, err := st.LatestBaseline()
+			if err != nil {
+				return fail(errOut, err)
+			}
+			if b == nil {
+				return fail(errOut, fmt.Errorf("no baselines yet"))
+			}
+			id, before = b.ID, b.BeforeContent
 		}
-		if r == nil {
-			return fail(errOut, fmt.Errorf("no refinements yet"))
-		}
-		refinementID = r.ID
 	} else {
-		refinementID, err = strconv.ParseInt(args[1], 10, 64)
+		id, err = strconv.ParseInt(args[1], 10, 64)
 		if err != nil {
-			return fail(errOut, fmt.Errorf("usage: respex restore --refine <id|latest> --before"))
+			return fail(errOut, fmt.Errorf("usage: respex restore <--refine|--baseline> <id|latest> --before"))
+		}
+		if kind == "refine" {
+			r, err := st.GetRefine(id)
+			if err != nil {
+				return fail(errOut, err)
+			}
+			before = r.BeforeContent
+		} else {
+			b, err := st.GetBaseline(id)
+			if err != nil {
+				return fail(errOut, err)
+			}
+			before = b.BeforeContent
 		}
 	}
-	r, err := st.GetRefine(refinementID)
-	if err != nil {
-		return fail(errOut, err)
-	}
-	if len(r.BeforeContent) == 0 {
-		return fail(errOut, fmt.Errorf("refinement #%d has no saved before-state", r.ID))
+	if len(before) == 0 {
+		return fail(errOut, fmt.Errorf("%s #%d has no saved before-state", kind, id))
 	}
 	current, err := spec.Read(w.specPath())
 	if err != nil {
 		return fail(errOut, err)
 	}
+	candidate, cleanup, err := createSpecCandidate(w.root, before)
+	if err != nil {
+		return fail(errOut, err)
+	}
+	defer cleanup()
 	started := time.Now()
-	if err := os.WriteFile(w.specPath(), r.BeforeContent, 0o644); err != nil {
+	if _, err := installSpecCandidate(w.specPath(), candidate, current); err != nil {
 		return fail(errOut, fmt.Errorf("restore spec: %w", err))
 	}
-	restoreID, err := st.InsertRefine("respex", "restored", spec.Hash(current), spec.Hash(r.BeforeContent), current, r.BeforeContent, "", "", started, time.Now())
+	restoreID, err := st.InsertRefine("respex", "restored", spec.Hash(current), spec.Hash(before), current, before, "", "", started, time.Now())
 	if err != nil {
-		if rollbackErr := os.WriteFile(w.specPath(), current, 0o644); rollbackErr != nil {
-			return fail(errOut, fmt.Errorf("record restore: %v; rollback spec: %w", err, rollbackErr))
+		rollback, cleanupRollback, createErr := createSpecCandidate(w.root, current)
+		if createErr == nil {
+			_, createErr = installSpecCandidate(w.specPath(), rollback, before)
+			cleanupRollback()
+		}
+		if createErr != nil {
+			return fail(errOut, fmt.Errorf("record restore: %v; rollback spec: %w", err, createErr))
 		}
 		return fail(errOut, err)
 	}
-	fmt.Fprintf(out, "restored spec to before refinement #%d; previous content saved as refinement #%d\n", r.ID, restoreID)
+	fmt.Fprintf(out, "restored spec to before %s #%d; previous content saved as refinement #%d\n", kind, id, restoreID)
 	return 0
 }

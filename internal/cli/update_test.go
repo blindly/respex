@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -21,6 +22,10 @@ func TestUpdateCheck(t *testing.T) {
 	var out, errOut bytes.Buffer
 	if code := runUpdate([]string{"--check"}, &out, &errOut); code != 0 || !strings.Contains(out.String(), "v1.0.0 → v9.9.9") {
 		t.Fatalf("update check = %d, %s | %s", code, out.String(), errOut.String())
+	}
+	out.Reset()
+	if code := runUpdate([]string{"--check", "--json"}, &out, &errOut); code != 0 || !json.Valid(out.Bytes()) {
+		t.Fatalf("JSON update check = %d, %s | %s", code, out.String(), errOut.String())
 	}
 }
 

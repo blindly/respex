@@ -149,6 +149,11 @@ func draftSpec(cfg config.Config, desc, specRel string, noProgress bool, out, er
 	if err != nil {
 		return fail(errOut, err)
 	}
+	candidatePath, cleanupCandidate, err := createSpecCandidate(".", nil)
+	if err != nil {
+		return fail(errOut, err)
+	}
+	defer cleanupCandidate()
 	tmpl := agent.PromptDraft
 	if cfg.Prompts.Draft != "" {
 		tmpl = cfg.Prompts.Draft
@@ -163,7 +168,7 @@ func draftSpec(cfg config.Config, desc, specRel string, noProgress bool, out, er
 	defer stop()
 	ctx, cancel := context.WithTimeout(signalCtx, cfg.AgentTimeout)
 	defer cancel()
-	code, err := a.Execute(ctx, agent.Expand(tmpl, desc, abs), abs, f)
+	code, err := a.Execute(ctx, agent.Expand(tmpl, desc, candidatePath), candidatePath, f)
 	progress.Stop()
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
@@ -177,9 +182,11 @@ func draftSpec(cfg config.Config, desc, specRel string, noProgress bool, out, er
 	if code != 0 {
 		return fail(errOut, fmt.Errorf("draft failed (exit %d) — log: %s", code, logPath))
 	}
-	if _, err := os.Stat(specRel); err != nil {
-		return fail(errOut, fmt.Errorf("agent did not create %s — log: %s", specRel, logPath))
+	content, err := installSpecCandidate(abs, candidatePath, nil)
+	if err != nil {
+		return fail(errOut, fmt.Errorf("install drafted spec — log: %s: %w", logPath, err))
 	}
+	warnMissingSections(out, content)
 	fmt.Fprintf(out, "drafted %s via %s — log: %s\n", specRel, cfg.Agent.Command[0], logPath)
 	return 0
 }

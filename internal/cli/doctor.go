@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -9,12 +10,17 @@ import (
 )
 
 func runDoctor(args []string, out, errOut io.Writer) int {
-	if len(args) != 0 {
-		return fail(errOut, errors.New("usage: respex doctor"))
+	jsonOutput := len(args) == 1 && args[0] == "--json"
+	if len(args) != 0 && !jsonOutput {
+		return fail(errOut, errors.New("usage: respex doctor [--json]"))
 	}
 	failed := false
+	var checks []map[string]string
 	report := func(status, name, detail string) {
-		fmt.Fprintf(out, "%-4s  %-12s %s\n", status, name, detail)
+		checks = append(checks, map[string]string{"status": status, "name": name, "detail": detail})
+		if !jsonOutput {
+			fmt.Fprintf(out, "%-4s  %-12s %s\n", status, name, detail)
+		}
 		if status == "FAIL" {
 			failed = true
 		}
@@ -76,8 +82,15 @@ func runDoctor(args []string, out, errOut io.Writer) int {
 		}
 	}
 	report("PASS", "version", version)
+	if jsonOutput {
+		if err := json.NewEncoder(out).Encode(map[string]any{"ok": !failed, "checks": checks}); err != nil {
+			return fail(errOut, err)
+		}
+	}
 	if failed {
-		fmt.Fprintln(errOut, "respex: doctor found failures")
+		if !jsonOutput {
+			fmt.Fprintln(errOut, "respex: doctor found failures")
+		}
 		return 1
 	}
 	return 0

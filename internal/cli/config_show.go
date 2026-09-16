@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -79,7 +80,7 @@ func redactEnv(env []string) string {
 	return "[" + strings.Join(redacted, ", ") + "]"
 }
 
-func runConfigShow(out, errOut io.Writer) int {
+func runConfigShow(out, errOut io.Writer, jsonOutput bool) int {
 	global, err := config.GlobalPath()
 	if err != nil {
 		return fail(errOut, err)
@@ -101,6 +102,21 @@ func runConfigShow(out, errOut io.Writer) int {
 	projectKeys, err := configKeys(project)
 	if err != nil {
 		return fail(errOut, err)
+	}
+	if jsonOutput {
+		value := func(v any, section, key string) map[string]any {
+			return map[string]any{"value": v, "source": configSource(userKeys, projectKeys, section, key)}
+		}
+		payload := map[string]any{
+			"spec": value(cfg.Spec, "", "spec"), "editor": value(cfg.Editor, "", "editor"),
+			"agent_timeout": value(cfg.AgentTimeout.String(), "", "agent_timeout"),
+			"agent_command": value(cfg.Agent.Command, "agent", "command"), "agent_delivery": value(cfg.Agent.Delivery, "agent", "delivery"),
+			"agent_env": value(redactEnv(cfg.Agent.Env), "agent", "env"),
+		}
+		if err := json.NewEncoder(out).Encode(payload); err != nil {
+			return fail(errOut, err)
+		}
+		return 0
 	}
 	fmt.Fprintf(out, "spec:          %s  (%s)\n", cfg.Spec, configSource(userKeys, projectKeys, "", "spec"))
 	fmt.Fprintf(out, "editor:        %s  (%s)\n", formatArgv(cfg.Editor), configSource(userKeys, projectKeys, "", "editor"))

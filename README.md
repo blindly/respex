@@ -50,6 +50,9 @@ respex commit -m "baseline existing implementation"
 
 Use `respex baseline --merge` when the spec already contains meaningful content.
 The agent preserves established intent and records conflicts as open questions.
+Draft, baseline, and refine operate on temporary candidates; `SPEC.md` is replaced
+only after the agent succeeds. Apply always receives an immutable copy of the
+committed spec, so external edits cannot change what a running apply implements.
 
 Edit `SPEC.md` by hand any time; `commit` snapshots whatever is there.
 
@@ -119,14 +122,16 @@ and agent configuration after an unchanged result. Edit the spec first or use
 respex diff --refine latest
 respex diff --refine 3
 respex restore --refine 3 --before
+respex restore --baseline 2 --before
 ```
 
 Restore operations also create snapshots, so they can be reversed. The database
 is local-only and gitignored; refinement history does not follow the repository
 to another machine. Commit important spec changes to Git.
 
-On Linux and macOS, cancellation terminates the agent process group. On Windows,
-only the direct agent process is terminated, so descendants may need manual cleanup.
+On Linux and macOS, cancellation first interrupts the agent process group and
+force-kills it after a grace period. On Windows, Respex uses `taskkill /T` to
+terminate the agent process tree.
 
 ## Maintenance
 
@@ -135,7 +140,12 @@ respex update --check              # check the latest GitHub release
 respex update                      # verify checksum and replace this binary
 respex update --version v0.1.1     # install a specific release
 respex doctor                      # diagnose config, tools, state, and locks
+respex spec validate               # check required spec sections
+respex completion powershell       # generate shell completion
+respex status --json               # machine-readable automation output
 ```
+
+`status`, `log`, `config show`, `doctor`, and `update --check` accept `--json`.
 
 Updates are installed only after the downloaded binary matches the release's
 `checksums.txt`. A failed download or checksum leaves the executable unchanged.

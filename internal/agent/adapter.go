@@ -131,6 +131,13 @@ func (a Adapter) Execute(ctx context.Context, prompt, specPath string, out io.Wr
 		}
 		return -1, fmt.Errorf("agent: %w", err)
 	case <-ctx.Done():
+		if interruptProcess(cmd) {
+			select {
+			case <-done:
+				return -1, ctx.Err()
+			case <-time.After(5 * time.Second):
+			}
+		}
 		_ = killProcess(cmd)
 		<-done
 		return -1, ctx.Err()

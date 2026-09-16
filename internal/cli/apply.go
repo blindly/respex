@@ -101,7 +101,14 @@ func runApply(args []string, out, errOut io.Writer) int {
 	if w.cfg.Prompts.Apply != "" {
 		tmpl = w.cfg.Prompts.Apply
 	}
-	absSpec := w.absSpecPath()
+	absSpec, cleanupSpec, err := createSpecCandidate(w.root, last.Content)
+	if err != nil {
+		return fail(errOut, err)
+	}
+	defer cleanupSpec()
+	if err := os.Chmod(absSpec, 0o444); err != nil {
+		return fail(errOut, err)
+	}
 	instr := agent.Expand(tmpl, "", absSpec)
 
 	logsDir := filepath.Join(w.root, ".respex", "logs")

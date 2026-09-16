@@ -27,20 +27,22 @@ func Main(args []string, stdout, stderr io.Writer) int {
 }
 
 var commands = map[string]func(args []string, out, errOut io.Writer) int{
-	"init":     runNew,
-	"new":      runNew,
-	"commit":   runCommit,
-	"diff":     runDiff,
-	"apply":    runApply,
-	"refine":   runRefine,
-	"baseline": runBaseline,
-	"log":      runLog,
-	"status":   runStatus,
-	"restore":  runRestore,
-	"config":   runConfig,
-	"edit":     runEdit,
-	"update":   runUpdate,
-	"doctor":   runDoctor,
+	"init":       runNew,
+	"new":        runNew,
+	"commit":     runCommit,
+	"diff":       runDiff,
+	"apply":      runApply,
+	"refine":     runRefine,
+	"baseline":   runBaseline,
+	"log":        runLog,
+	"status":     runStatus,
+	"restore":    runRestore,
+	"config":     runConfig,
+	"edit":       runEdit,
+	"update":     runUpdate,
+	"doctor":     runDoctor,
+	"spec":       runSpec,
+	"completion": runCompletion,
 }
 
 func usage(w io.Writer) {
@@ -64,6 +66,8 @@ Commands:
   config     initialize, edit, validate, or show configuration
   update     securely update the respex binary
   doctor     diagnose configuration and project health
+  spec       validate the working specification
+  completion generate shell completion
 `)
 }
 

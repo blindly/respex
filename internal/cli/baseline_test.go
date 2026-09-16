@@ -33,10 +33,17 @@ func TestBaselineGeneratesAndDiffsSpec(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.Close()
 	baselines, err := st.ListBaselines()
 	if err != nil || len(baselines) != 1 || baselines[0].Outcome != "generated" {
 		t.Fatalf("baselines = %+v, %v", baselines, err)
+	}
+	st.Close()
+	if code := runRestore([]string{"--baseline", "latest", "--before"}, &out, &errOut); code != 0 {
+		t.Fatalf("restore baseline = %d, %s | %s", code, out.String(), errOut.String())
+	}
+	body, err = os.ReadFile(filepath.Join(root, "SPEC.md"))
+	if err != nil || string(body) != spec.Skeleton {
+		t.Fatalf("restored baseline = %q, %v", body, err)
 	}
 }
 

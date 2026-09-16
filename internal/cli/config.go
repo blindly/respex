@@ -66,12 +66,15 @@ func validateConfig(path string, local bool) error {
 }
 
 func runConfig(args []string, out, errOut io.Writer) int {
+	if len(args) == 2 && args[0] == "show" && args[1] == "--json" {
+		return runConfigShow(out, errOut, true)
+	}
 	action, local, err := parseConfigArgs(args)
 	if err != nil {
 		return fail(errOut, err)
 	}
 	if action == "show" {
-		return runConfigShow(out, errOut)
+		return runConfigShow(out, errOut, false)
 	}
 	path, level, err := configTarget(local)
 	if err != nil {

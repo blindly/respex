@@ -98,7 +98,7 @@ func TestLifecycleEndToEnd(t *testing.T) {
 		t.Fatalf("apply: %d, %s", code, out)
 	}
 	marker, _ := os.ReadFile(filepath.Join(root, "marker"))
-	if !strings.Contains(string(marker), "conform") || !strings.Contains(string(marker), "SPEC.md") {
+	if !strings.Contains(string(marker), "conform") || !strings.Contains(string(marker), filepath.Join(".respex", "tmp", "spec-")) {
 		t.Fatalf("apply prompt wrong: %q", marker)
 	}
 
@@ -110,8 +110,8 @@ func TestLifecycleEndToEnd(t *testing.T) {
 	// Refine round-trip: the agent rewrites the spec, which is then
 	// committed and applied as v2.
 	write(t, filepath.Join(root, ".respex", "config.toml"),
-		fmt.Sprintf("[agent]\ncommand = [%q, \"-write\", %q, \"-content\", \"# Demo\\n\\n## Intent\\n\\nRefined by agent.\\n\", \"-marker\", %q, \"{{prompt}}\"]\n",
-			fakeBin, filepath.Join(root, "SPEC.md"), filepath.Join(root, "marker")))
+		fmt.Sprintf("[agent]\ncommand = [%q, \"-write\", \"{{spec_path}}\", \"-content\", \"# Demo\\n\\n## Intent\\n\\nRefined by agent.\\n\", \"-marker\", %q, \"{{prompt}}\"]\n",
+			fakeBin, filepath.Join(root, "marker")))
 	out, code = run(t, root, "refine")
 	if code != 0 || !strings.Contains(out, "spec updated") {
 		t.Fatalf("refine: %d, %s", code, out)
@@ -120,6 +120,8 @@ func TestLifecycleEndToEnd(t *testing.T) {
 	if !strings.Contains(string(refined), "Refined by agent.") {
 		t.Fatalf("refined spec: %q", refined)
 	}
+	write(t, filepath.Join(root, ".respex", "config.toml"),
+		fmt.Sprintf("[agent]\ncommand = [%q, \"-marker\", %q, \"{{prompt}}\"]\n", fakeBin, filepath.Join(root, "marker")))
 	out, code = run(t, root, "commit", "-m", "refined")
 	if code != 0 || !strings.Contains(out, "committed v2") {
 		t.Fatalf("commit refined: %d, %s", code, out)

@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"strings"
 )
 
 // Skeleton is the spec file written by `respex init` without a description.
@@ -48,4 +49,19 @@ func Read(path string) ([]byte, error) {
 func Hash(content []byte) string {
 	sum := sha256.Sum256(content)
 	return hex.EncodeToString(sum[:])
+}
+
+func MissingSections(content []byte) []string {
+	required := []string{"Intent", "Scope", "Non-Goals", "Requirements", "Open Questions"}
+	found := make(map[string]bool, len(required))
+	for _, line := range strings.Split(string(content), "\n") {
+		found[strings.TrimSpace(line)] = true
+	}
+	var missing []string
+	for _, section := range required {
+		if !found["## "+section] {
+			missing = append(missing, section)
+		}
+	}
+	return missing
 }

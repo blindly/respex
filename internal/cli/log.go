@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -15,8 +16,9 @@ import (
 )
 
 func runLog(args []string, out, errOut io.Writer) int {
-	if len(args) != 0 {
-		return fail(errOut, fmt.Errorf("unexpected argument %q — usage: respex log", args[0]))
+	jsonOutput := len(args) == 1 && args[0] == "--json"
+	if len(args) != 0 && !jsonOutput {
+		return fail(errOut, fmt.Errorf("unexpected argument %q — usage: respex log [--json]", args[0]))
 	}
 	w, err := discover()
 	if err != nil {
@@ -42,6 +44,12 @@ func runLog(args []string, out, errOut io.Writer) int {
 	baselines, err := st.ListBaselines()
 	if err != nil {
 		return fail(errOut, err)
+	}
+	if jsonOutput {
+		if err := json.NewEncoder(out).Encode(map[string]any{"versions": versions, "applies": applies, "baselines": baselines, "refinements": refines}); err != nil {
+			return fail(errOut, err)
+		}
+		return 0
 	}
 
 	fmt.Fprintln(out, "versions:")
@@ -84,8 +92,9 @@ func runLog(args []string, out, errOut io.Writer) int {
 }
 
 func runStatus(args []string, out, errOut io.Writer) int {
-	if len(args) != 0 {
-		return fail(errOut, fmt.Errorf("unexpected argument %q — usage: respex status", args[0]))
+	jsonOutput := len(args) == 1 && args[0] == "--json"
+	if len(args) != 0 && !jsonOutput {
+		return fail(errOut, fmt.Errorf("unexpected argument %q — usage: respex status [--json]", args[0]))
 	}
 	w, err := discover()
 	if err != nil {
@@ -97,8 +106,12 @@ func runStatus(args []string, out, errOut io.Writer) int {
 	}
 	defer st.Close()
 
+	display := out
+	if jsonOutput {
+		display = io.Discard
+	}
 	absSpec := w.absSpecPath()
-	fmt.Fprintf(out, "spec:        %s\n", absSpec)
+	fmt.Fprintf(display, "spec:        %s\n", absSpec)
 	lastV, err := st.LatestVersion()
 	if err != nil {
 		return fail(errOut, err)
@@ -127,9 +140,9 @@ func runStatus(args []string, out, errOut io.Writer) int {
 			dirty = "yes"
 		}
 	}
-	fmt.Fprintf(out, "dirty:       %s\n", dirty)
-	fmt.Fprintf(out, "last commit: %s\n", last)
-	fmt.Fprintf(out, "applied:     %s\n", applied)
+	fmt.Fprintf(display, "dirty:       %s\n", dirty)
+	fmt.Fprintf(display, "last commit: %s\n", last)
+	fmt.Fprintf(display, "applied:     %s\n", applied)
 	applyState := "idle"
 	lock, locked, err := tryApplyLock(filepath.Join(w.root, ".respex", "operation.lock"))
 	if err != nil {
@@ -153,7 +166,7 @@ func runStatus(args []string, out, errOut io.Writer) int {
 			applyState = "previous run ended unexpectedly"
 		}
 	}
-	fmt.Fprintf(out, "apply:       %s\n", applyState)
+	fmt.Fprintf(display, "apply:       %s\n", applyState)
 	refines, err := st.ListRefines()
 	if err != nil {
 		return fail(errOut, err)
@@ -162,7 +175,7 @@ func runStatus(args []string, out, errOut io.Writer) int {
 	if len(refines) > 0 {
 		refined = fmt.Sprintf("%d times; last %s at %s", len(refines), refines[0].Outcome, refines[0].StartedAt.Format(time.RFC3339))
 	}
-	fmt.Fprintf(out, "refined:     %s\n", refined)
+	fmt.Fprintf(display, "refined:     %s\n", refined)
 	baselines, err := st.ListBaselines()
 	if err != nil {
 		return fail(errOut, err)
@@ -171,7 +184,7 @@ func runStatus(args []string, out, errOut io.Writer) int {
 	if len(baselines) > 0 {
 		baselineState = fmt.Sprintf("%d times; last %s at %s", len(baselines), baselines[0].Outcome, baselines[0].StartedAt.Format(time.RFC3339))
 	}
-	fmt.Fprintf(out, "baselined:   %s\n", baselineState)
+	fmt.Fprintf(display, "baselined:   %s\n", baselineState)
 	refineState := "ready"
 	if readErr == nil {
 		workingHash := spec.Hash(content)
@@ -189,11 +202,17 @@ func runStatus(args []string, out, errOut io.Writer) int {
 			}
 		}
 	}
-	fmt.Fprintf(out, "refine:      %s\n", refineState)
+	fmt.Fprintf(display, "refine:      %s\n", refineState)
 	agentLine := "(not configured)"
 	if len(w.cfg.Agent.Command) > 0 {
 		agentLine = w.cfg.Agent.Command[0] + " (configured)"
 	}
-	fmt.Fprintf(out, "agent:       %s\n", agentLine)
+	fmt.Fprintf(display, "agent:       %s\n", agentLine)
+	if jsonOutput {
+		payload := map[string]any{"spec": absSpec, "dirty": dirty, "last_commit": last, "applied": applied, "apply_state": applyState, "refined": refined, "baselined": baselineState, "refine_state": refineState, "agent": agentLine}
+		if err := json.NewEncoder(out).Encode(payload); err != nil {
+			return fail(errOut, err)
+		}
+	}
 	return 0
 }

@@ -14,6 +14,16 @@ func TestHashKnownVector(t *testing.T) {
 	}
 }
 
+func TestMissingSections(t *testing.T) {
+	if missing := MissingSections([]byte(Skeleton)); len(missing) != 0 {
+		t.Fatalf("skeleton missing sections: %v", missing)
+	}
+	missing := MissingSections([]byte("## Intent\n"))
+	if len(missing) != 4 || missing[0] != "Scope" {
+		t.Fatalf("missing sections = %v", missing)
+	}
+}
+
 func TestReadEmptyFails(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "SPEC.md")
 	if err := os.WriteFile(p, nil, 0o644); err != nil {

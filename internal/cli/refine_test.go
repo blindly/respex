@@ -29,8 +29,8 @@ func TestRefineRewritesSpec(t *testing.T) {
 	if !strings.Contains(string(markerBody), "inspect this repository") {
 		t.Fatalf("marker missing PromptRefine text: %q", markerBody)
 	}
-	if !strings.Contains(string(markerBody), filepath.Join(root, "SPEC.md")) {
-		t.Fatalf("marker missing spec path: %q", markerBody)
+	if !strings.Contains(string(markerBody), filepath.Join(root, ".respex", "tmp", "spec-")) {
+		t.Fatalf("marker missing candidate spec path: %q", markerBody)
 	}
 }
 
@@ -134,7 +134,7 @@ func TestRefineCustomPrompt(t *testing.T) {
 		t.Fatalf("refine custom = %d, %s | %s", code, out.String(), errOut.String())
 	}
 	body, _ := os.ReadFile(marker)
-	if !strings.Contains(string(body), "CUSTOM "+filepath.Join(root, "SPEC.md")) {
+	if !strings.Contains(string(body), "CUSTOM "+filepath.Join(root, ".respex", "tmp", "spec-")) {
 		t.Fatalf("marker prompt wrong: %q", body)
 	}
 }
@@ -152,10 +152,14 @@ func TestRefineTimeout(t *testing.T) {
 func TestRefineAgentFails(t *testing.T) {
 	root := setupProject(t)
 	writeSpec(t, root, "# x\n")
-	writeConfig(t, root, fmt.Sprintf("[agent]\ncommand = [%q, \"-fail\", \"{{prompt}}\"]\n", fakeBin))
+	writeConfig(t, root, fmt.Sprintf("[agent]\ncommand = [%q, \"-write\", \"{{spec_path}}\", \"-content\", \"# partial\\n\", \"-fail\", \"{{prompt}}\"]\n", fakeBin))
 	var out, errOut bytes.Buffer
 	if code := runRefine(nil, &out, &errOut); code != 1 || !strings.Contains(errOut.String(), "refine failed (exit 1)") {
 		t.Fatalf("refine fail: %d, %s | %s", code, out.String(), errOut.String())
+	}
+	content, err := os.ReadFile(filepath.Join(root, "SPEC.md"))
+	if err != nil || string(content) != "# x\n" {
+		t.Fatalf("failed refinement changed live spec: %q, %v", content, err)
 	}
 }
 
@@ -164,7 +168,7 @@ func TestRefineAgentRemovesSpec(t *testing.T) {
 	writeSpec(t, root, "# x\n")
 	writeConfig(t, root, fmt.Sprintf("[agent]\ncommand = [%q, \"-write\", \"{{spec_path}}\", \"-content\", \"\"]\n", fakeBin))
 	var out, errOut bytes.Buffer
-	if code := runRefine(nil, &out, &errOut); code != 1 || !strings.Contains(errOut.String(), "agent removed the spec") {
+	if code := runRefine(nil, &out, &errOut); code != 1 || !strings.Contains(errOut.String(), "install refined spec") {
 		t.Fatalf("refine removed: %d, %s | %s", code, out.String(), errOut.String())
 	}
 }
