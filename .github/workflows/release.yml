@@ -20,8 +20,8 @@ jobs:
       - run: git diff --exit-code
       - run: go vet ./...
       - run: go test ./...
-      - run: go build -ldflags "-X github.com/blindly/respex/internal/cli.version=${GITHUB_REF_NAME}" -o respex-version-check .
-      - run: test "$(./respex-version-check --version)" = "respex ${GITHUB_REF_NAME}"
+      - run: go build -ldflags "-X github.com/blindly/respex/internal/cli.version=${GITHUB_REF_NAME}" -o "${RUNNER_TEMP}/respex-version-check" .
+      - run: test "$("${RUNNER_TEMP}/respex-version-check" --version)" = "respex ${GITHUB_REF_NAME}"
       - uses: goreleaser/goreleaser-action@v6
         with:
           args: release --clean
