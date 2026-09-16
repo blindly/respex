@@ -17,6 +17,7 @@ import (
 
 const configTemplate = `# respex configuration
 # spec = "SPEC.md"
+# editor = ["code", "--wait"]
 # agent_timeout = "1h"
 # Add keys inside the tables below — do not redeclare [agent] or [prompts].
 

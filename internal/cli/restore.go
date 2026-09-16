@@ -24,7 +24,7 @@ func runRestore(args []string, out, errOut io.Writer) int {
 		return fail(errOut, fmt.Errorf("acquire operation lock: %w", err))
 	}
 	if !locked {
-		return fail(errOut, fmt.Errorf("another apply, refine, or restore is already running in this project"))
+		return fail(errOut, fmt.Errorf("another apply, refine, restore, or edit is already running in this project"))
 	}
 	defer lock.Close()
 	st, err := w.openState()

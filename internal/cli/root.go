@@ -36,6 +36,7 @@ var commands = map[string]func(args []string, out, errOut io.Writer) int{
 	"status":  runStatus,
 	"restore": runRestore,
 	"config":  runConfig,
+	"edit":    runEdit,
 }
 
 func usage(w io.Writer) {
@@ -46,6 +47,7 @@ Usage:
 
 Commands:
   new        scaffold .respex/ + SPEC.md (agent-drafted with a description)
+  edit       open the spec in the configured editor
   refine     agent critiques and rewrites the spec
   diff       diff working spec vs last commit (or two versions)
   commit     snapshot the working spec as the approved version

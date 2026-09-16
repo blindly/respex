@@ -30,6 +30,7 @@ go build .
 ## Quick start
 
     respex new "a CLI that converts CSV to JSON"   # scaffold + agent-drafted spec
+    respex edit                                     # open SPEC.md in your editor
     respex refine                                   # agent improves the spec (repo-aware)
     respex diff --refine latest                     # review exactly what the agent changed
     respex diff                                     # compare working spec with last commit
@@ -57,6 +58,7 @@ The user config provides defaults for every project. `.respex/config.toml`
 
 ```toml
 spec = "SPEC.md"
+editor = ["code", "--wait"]                # optional editor argv
 agent_timeout = "1h"                       # hard limit; Go duration syntax
 
 [agent]
@@ -72,6 +74,9 @@ putting only this in `.respex/config.toml`:
 [agent]
 command = ["claude", "-p", "{{prompt}}"]
 ```
+
+`respex edit` uses the configured editor array, then `VISUAL`, then `EDITOR`,
+and finally Notepad on Windows. GUI editors should include their wait argument.
 
 Other user-level settings continue to be inherited. Placeholders: `{{prompt}}`
 (instruction text) and `{{spec_path}}` (spec file path).

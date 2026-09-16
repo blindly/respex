@@ -130,7 +130,7 @@ func runStatus(args []string, out, errOut io.Writer) int {
 		if unfinished {
 			applyState = "running"
 		} else {
-			applyState = "refine or restore running"
+			applyState = "refine, restore, or edit running"
 		}
 	} else {
 		lock.Close()

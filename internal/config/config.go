@@ -31,17 +31,19 @@ type Prompts struct {
 // prompt overrides.
 type Config struct {
 	Spec         string        `toml:"spec"`
+	Editor       []string      `toml:"editor"`
 	AgentTimeout time.Duration `toml:"-"`
 	Agent        Agent         `toml:"agent"`
 	Prompts      Prompts       `toml:"prompts"`
 }
 
 type fileConfig struct {
-	Spec         string  `toml:"spec"`
-	AgentTimeout string  `toml:"agent_timeout"`
-	ApplyTimeout string  `toml:"apply_timeout"`
-	Agent        Agent   `toml:"agent"`
-	Prompts      Prompts `toml:"prompts"`
+	Spec         string   `toml:"spec"`
+	Editor       []string `toml:"editor"`
+	AgentTimeout string   `toml:"agent_timeout"`
+	ApplyTimeout string   `toml:"apply_timeout"`
+	Agent        Agent    `toml:"agent"`
+	Prompts      Prompts  `toml:"prompts"`
 }
 
 // Defaults returns the built-in configuration.
@@ -71,7 +73,7 @@ func Load(globalPath, projectPath string) (Config, error) {
 		if err := toml.NewDecoder(bytes.NewReader(b)).DisallowUnknownFields().Decode(&raw); err != nil {
 			return Config{}, fmt.Errorf("parse config %s: %w", p, err)
 		}
-		c := Config{Spec: raw.Spec, Agent: raw.Agent, Prompts: raw.Prompts}
+		c := Config{Spec: raw.Spec, Editor: raw.Editor, Agent: raw.Agent, Prompts: raw.Prompts}
 		timeoutRaw := raw.AgentTimeout
 		if timeoutRaw == "" {
 			timeoutRaw = raw.ApplyTimeout
@@ -90,6 +92,9 @@ func Load(globalPath, projectPath string) (Config, error) {
 func merge(dst *Config, src Config) {
 	if src.Spec != "" {
 		dst.Spec = src.Spec
+	}
+	if len(src.Editor) > 0 {
+		dst.Editor = src.Editor
 	}
 	if src.AgentTimeout > 0 {
 		dst.AgentTimeout = src.AgentTimeout

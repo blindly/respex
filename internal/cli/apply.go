@@ -56,7 +56,7 @@ func runApply(args []string, out, errOut io.Writer) int {
 		return fail(errOut, fmt.Errorf("acquire operation lock: %w", err))
 	}
 	if !locked {
-		return fail(errOut, errors.New("another apply, refine, or restore is already running in this project"))
+		return fail(errOut, errors.New("another apply, refine, restore, or edit is already running in this project"))
 	}
 	defer lock.Close()
 	applied, err := st.IsApplied(last.ID)
