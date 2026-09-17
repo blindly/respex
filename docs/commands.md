@@ -119,6 +119,10 @@ to also run a short test prompt through the agent and verify it responds.
 Check that the working spec has the required sections: Intent, Scope,
 Non-Goals, Requirements, Open Questions.
 
+### `respex spec questions [--json]`
+List all open questions from the master spec and any configured feature specs.
+Useful for reviewing what still needs a human decision before applying.
+
 ### `respex check [--json]`
 Validate the configured spec bundle for structural problems: missing spec files,
 empty files, missing required sections, broken internal Markdown links, and

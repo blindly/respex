@@ -69,7 +69,7 @@ Commands:
   config     initialize, edit, validate, or show configuration
   update     securely update the respex binary
   doctor     diagnose configuration and project health
-  spec       validate the working specification
+  spec       validate the working specification or list open questions
   check      validate the spec bundle for structural and link problems
   completion generate shell completion
 `)

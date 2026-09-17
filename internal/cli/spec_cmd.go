@@ -15,7 +15,21 @@ func warnMissingSections(out io.Writer, content []byte) {
 }
 
 func runSpec(args []string, out, errOut io.Writer) int {
-	if len(args) != 1 || args[0] != "validate" {
+	if len(args) == 0 {
+		return fail(errOut, fmt.Errorf("usage: respex spec <validate|questions>"))
+	}
+	switch args[0] {
+	case "validate":
+		return runSpecValidate(args[1:], out, errOut)
+	case "questions":
+		return runSpecQuestions(args[1:], out, errOut)
+	default:
+		return fail(errOut, fmt.Errorf("usage: respex spec <validate|questions>"))
+	}
+}
+
+func runSpecValidate(args []string, out, errOut io.Writer) int {
+	if len(args) != 0 {
 		return fail(errOut, fmt.Errorf("usage: respex spec validate"))
 	}
 	w, err := discover()
