@@ -2,6 +2,8 @@
 
 Spec-driven agentic development: one markdown spec per repo, applied by any agent CLI.
 
+Documentation: [https://blindly.github.io/respex](https://blindly.github.io/respex)
+
 `respex` manages the lifecycle of a design spec and dispatches any agentic CLI
 (Claude Code, Gemini CLI, Codex, aider, opencode, amp, …) to act on it:
 
