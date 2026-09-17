@@ -1,3 +1,9 @@
+---
+layout: default
+title: Workflows
+nav_order: 5
+---
+
 # Workflows
 
 ## New project

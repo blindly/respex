@@ -1,3 +1,9 @@
+---
+layout: default
+title: Respex
+nav_order: 1
+---
+
 # Respex
 
 Spec-driven agentic development: one markdown spec per repo, applied by any agent CLI.

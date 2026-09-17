@@ -1,3 +1,9 @@
+---
+layout: default
+title: Multi-file specs
+nav_order: 6
+---
+
 # Multi-file specs
 
 Larger codebases can split the specification into a bundle: a master spec plus

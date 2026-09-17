@@ -2,17 +2,15 @@ title: Respex
 description: Spec-driven agentic development
 url: https://blindly.github.io
 baseurl: /respex
-theme: minima
-markdown: kramdown
-kramdown:
-  input: GFM
-  syntax_highlighter: rouge
+remote_theme: just-the-docs/just-the-docs
+plugins:
+  - jekyll-remote-theme
+search_enabled: true
+heading_anchors: true
+color_scheme: light
+aux_links:
+  Respex on GitHub:
+    - "https://github.com/blindly/respex"
 exclude:
   - superpowers/
   - README.md
-header_pages:
-  - getting-started.md
-  - configuration.md
-  - commands.md
-  - workflows.md
-  - multi-file-specs.md
