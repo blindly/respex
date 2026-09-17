@@ -1,4 +1,4 @@
-# respex
+# ReSpex
 
 Spec-driven agentic development: one markdown spec per repo, applied by any agent CLI.
 
@@ -157,7 +157,7 @@ output is captured under `.respex/logs/`. Interactive terminals show an elapsed
 time spinner during agent operations; use `--no-progress` or set `NO_COLOR` to
 disable it. The timeout applies to drafting, refine, and apply. Only one apply,
 refine, restore, or edit can run per project; the lock is released automatically
-when Respex exits.
+when ReSpex exits.
 
 ## State
 
@@ -181,7 +181,7 @@ is local-only and gitignored; refinement history does not follow the repository
 to another machine. Commit important spec changes to Git.
 
 On Linux and macOS, cancellation first interrupts the agent process group and
-force-kills it after a grace period. On Windows, Respex uses `taskkill /T` to
+force-kills it after a grace period. On Windows, ReSpex uses `taskkill /T` to
 terminate the agent process tree.
 
 ## Maintenance

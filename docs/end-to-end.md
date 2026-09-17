@@ -6,7 +6,7 @@ nav_order: 7
 
 # End-to-end process
 
-Respex is a small state machine around a Markdown spec. The goal is to keep the
+ReSpex is a small state machine around a Markdown spec. The goal is to keep the
 spec as the durable source of truth and use an agent CLI to converge the code
 toward it.
 

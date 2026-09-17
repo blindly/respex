@@ -1,10 +1,10 @@
 ---
 layout: default
-title: Respex
+title: ReSpex
 nav_order: 1
 ---
 
-# Respex
+# ReSpex
 
 Spec-driven agentic development: one markdown spec per repo, applied by any agent CLI.
 
@@ -15,7 +15,7 @@ Spec-driven agentic development: one markdown spec per repo, applied by any agen
 init → view/edit → refine → diff → commit → apply
 ```
 
-The spec is the durable source of truth; the codebase converges to it. Respex
+The spec is the durable source of truth; the codebase converges to it. ReSpex
 coordinates commits, agent runs, history, and rollback so changes are
 reviewable and recoverable.
 

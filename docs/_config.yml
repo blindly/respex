@@ -1,4 +1,4 @@
-title: Respex
+title: ReSpex
 description: Spec-driven agentic development
 url: https://blindly.github.io
 baseurl: /respex
@@ -9,7 +9,7 @@ search_enabled: true
 heading_anchors: true
 color_scheme: light
 aux_links:
-  Respex on GitHub:
+  ReSpex on GitHub:
     - "https://github.com/blindly/respex"
 permalink: pretty
 exclude:

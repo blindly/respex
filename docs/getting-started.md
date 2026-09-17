@@ -54,7 +54,7 @@ respex diff --refine latest
 respex commit -m "refined auth requirements"
 ```
 
-Refinement is repeatable. Respex stores the before/after content of every
+Refinement is repeatable. ReSpex stores the before/after content of every
 refinement so you can review or restore.
 
 ## Apply the spec
@@ -66,4 +66,4 @@ respex apply
 Apply gives the agent an immutable copy of the committed spec, then runs the
 agent against the repository. Output is captured in `.respex/logs/`.
 
-Run `respex apply` again and Respex reports that the version is already applied.
+Run `respex apply` again and ReSpex reports that the version is already applied.

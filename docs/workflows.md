@@ -55,7 +55,7 @@ respex commit -m "clarify auth requirements"
 respex apply
 ```
 
-Refinement is repeatable. Respex rejects a refine that would be a no-op:
+Refinement is repeatable. ReSpex rejects a refine that would be a no-op:
 
 - The spec is still the generated skeleton.
 - The exact same spec, prompt, and agent configuration was last refined
@@ -87,6 +87,6 @@ Restore creates a reversible history entry, so you can change your mind.
 ## Cancel an agent run
 
 On Linux and macOS, `Ctrl-C` first interrupts the agent process group and
-force-kills it after a grace period. On Windows, Respex uses `taskkill /T` to
+force-kills it after a grace period. On Windows, ReSpex uses `taskkill /T` to
 terminate the agent process tree. The live spec is not modified on failure,
 timeout, or interruption.

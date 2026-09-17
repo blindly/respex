@@ -6,7 +6,7 @@ nav_order: 3
 
 # Configuration
 
-Respex merges configuration in this order:
+ReSpex merges configuration in this order:
 
 ```text
 built-in defaults

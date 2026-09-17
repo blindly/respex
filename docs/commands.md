@@ -13,7 +13,7 @@ respex <command> [args]
 ## Core workflow
 
 ### `respex init [description]`
-Initialize Respex in the current repository. With a description and configured
+Initialize ReSpex in the current repository. With a description and configured
 agent, drafts the first spec. Without an agent, writes a skeleton.
 
 ```text
