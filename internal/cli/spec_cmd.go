@@ -22,13 +22,17 @@ func runSpec(args []string, out, errOut io.Writer) int {
 	if err != nil {
 		return fail(errOut, err)
 	}
-	content, err := spec.Read(w.specPath())
+	files, err := w.readSpecFiles()
 	if err != nil {
 		return fail(errOut, err)
 	}
-	missing := spec.MissingSections(content)
+	missing := spec.MissingSections(files[0].Content)
 	if len(missing) > 0 {
 		return fail(errOut, fmt.Errorf("spec is missing required sections: %s", strings.Join(missing, ", ")))
+	}
+	if len(files) > 1 {
+		fmt.Fprintf(out, "spec bundle is structurally valid (%d files)\n", len(files))
+		return 0
 	}
 	fmt.Fprintln(out, "spec is structurally valid")
 	return 0

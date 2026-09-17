@@ -22,7 +22,7 @@ func open(t *testing.T) *DB {
 
 func TestFreshOpenCreatesCurrentSchema(t *testing.T) {
 	d := open(t)
-	if v, err := d.SchemaVersion(); err != nil || v != 5 {
+	if v, err := d.SchemaVersion(); err != nil || v != 6 {
 		t.Fatalf("schema version = %d, %v", v, err)
 	}
 }
@@ -128,7 +128,7 @@ func TestMigrateLegacyDatabasePreservesHistory(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer migrated.Close()
-	if version, err := migrated.SchemaVersion(); err != nil || version != 5 {
+	if version, err := migrated.SchemaVersion(); err != nil || version != 6 {
 		t.Fatalf("schema version = %d, %v", version, err)
 	}
 	applies, err := migrated.ListApplies()
@@ -184,8 +184,8 @@ func TestMigrateRollback(t *testing.T) {
 		return errors.New("boom")
 	})
 
-	if _, err := Open(p); err == nil || !strings.Contains(err.Error(), "migrate to v6") {
-		t.Fatalf("Open with failing migration: err = %v, want migrate to v6 error", err)
+	if _, err := Open(p); err == nil || !strings.Contains(err.Error(), "migrate to v7") {
+		t.Fatalf("Open with failing migration: err = %v, want migrate to v7 error", err)
 	}
 
 	migrations = orig
@@ -194,8 +194,8 @@ func TestMigrateRollback(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { d2.Close() })
-	if v, err := d2.SchemaVersion(); err != nil || v != 5 {
-		t.Fatalf("schema version after failed migration = %d, %v; want 5", v, err)
+	if v, err := d2.SchemaVersion(); err != nil || v != 6 {
+		t.Fatalf("schema version after failed migration = %d, %v; want 6", v, err)
 	}
 	var n int
 	if err := d2.db.QueryRow(`SELECT count(*) FROM sqlite_master

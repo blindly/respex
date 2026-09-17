@@ -44,7 +44,10 @@ type Baseline struct {
 	AfterHash     string
 	BeforeContent []byte
 	AfterContent  []byte
-	LogPath       string
+	// Proposal holds a JSON-encoded split proposal (before/after file maps)
+	// for `baseline --split` rows; empty for ordinary baselines.
+	Proposal []byte
+	LogPath  string
 }
 
 type Refine struct {
@@ -165,6 +168,10 @@ var migrations = []func(tx *sql.Tx) error{
 			after_content  BLOB NOT NULL,
 			log_path       TEXT NOT NULL
 		)`)
+		return err
+	},
+	func(tx *sql.Tx) error {
+		_, err := tx.Exec(`ALTER TABLE baselines ADD COLUMN proposal BLOB NOT NULL DEFAULT X''`)
 		return err
 	},
 }
@@ -482,19 +489,32 @@ func (s *DB) LatestRefine() (*Refine, error) {
 	return &refines[0], nil
 }
 
-func (s *DB) InsertBaseline(agent, outcome, beforeHash, afterHash string, beforeContent, afterContent []byte, logPath string, started, finished time.Time) (int64, error) {
+func (s *DB) InsertBaseline(agent, outcome, beforeHash, afterHash string, beforeContent, afterContent, proposal []byte, logPath string, started, finished time.Time) (int64, error) {
+	if proposal == nil {
+		proposal = []byte{}
+	}
 	res, err := s.db.Exec(`INSERT INTO baselines
-		(agent, started_at, finished_at, outcome, before_hash, after_hash, before_content, after_content, log_path)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, agent, started.UTC().Format(time.RFC3339),
-		finished.UTC().Format(time.RFC3339), outcome, beforeHash, afterHash, beforeContent, afterContent, logPath)
+		(agent, started_at, finished_at, outcome, before_hash, after_hash, before_content, after_content, proposal, log_path)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, agent, started.UTC().Format(time.RFC3339),
+		finished.UTC().Format(time.RFC3339), outcome, beforeHash, afterHash, beforeContent, afterContent, proposal, logPath)
 	if err != nil {
 		return 0, fmt.Errorf("insert baseline: %w", err)
 	}
 	return res.LastInsertId()
 }
 
+// SetBaselineOutcome updates the outcome of a baseline row — used when a
+// pending split proposal is accepted or discarded.
+func (s *DB) SetBaselineOutcome(id int64, outcome string) error {
+	_, err := s.db.Exec(`UPDATE baselines SET outcome = ? WHERE id = ?`, outcome, id)
+	if err != nil {
+		return fmt.Errorf("set baseline outcome: %w", err)
+	}
+	return nil
+}
+
 func (s *DB) ListBaselines() ([]Baseline, error) {
-	rows, err := s.db.Query(`SELECT id, agent, started_at, finished_at, outcome, before_hash, after_hash, before_content, after_content, log_path
+	rows, err := s.db.Query(`SELECT id, agent, started_at, finished_at, outcome, before_hash, after_hash, before_content, after_content, proposal, log_path
 		FROM baselines ORDER BY id DESC`)
 	if err != nil {
 		return nil, fmt.Errorf("list baselines: %w", err)
@@ -504,7 +524,7 @@ func (s *DB) ListBaselines() ([]Baseline, error) {
 	for rows.Next() {
 		var b Baseline
 		var started, finished string
-		if err := rows.Scan(&b.ID, &b.Agent, &started, &finished, &b.Outcome, &b.BeforeHash, &b.AfterHash, &b.BeforeContent, &b.AfterContent, &b.LogPath); err != nil {
+		if err := rows.Scan(&b.ID, &b.Agent, &started, &finished, &b.Outcome, &b.BeforeHash, &b.AfterHash, &b.BeforeContent, &b.AfterContent, &b.Proposal, &b.LogPath); err != nil {
 			return nil, fmt.Errorf("list baselines: %w", err)
 		}
 		b.StartedAt, err = parseRFC3339(started)

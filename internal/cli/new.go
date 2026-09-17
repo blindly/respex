@@ -20,7 +20,10 @@ import (
 
 const configTemplate = `# respex configuration
 # spec = "SPEC.md"
+# Additional spec files committed/applied alongside the master spec:
+# spec_files = ["specs/authentication.md", "specs/billing.md"]
 # editor = ["code", "--wait"]
+# pager = ["less", "-FRX"]
 # agent_timeout = "1h"
 # Add keys inside the tables below — do not redeclare [agent] or [prompts].
 
@@ -117,9 +120,9 @@ func runNew(args []string, out, errOut io.Writer) int {
 			fmt.Fprintln(out, "no agent configured — set [agent] command in .respex/config.toml, then run `respex refine`")
 		} else if existingProject {
 			if len(cfg.Agent.Command) > 0 {
-				fmt.Fprintln(out, "existing repository detected — run `respex baseline` to derive the initial spec")
+				fmt.Fprintln(out, "existing repository detected — run `respex baseline` (or `--split` for a multi-file spec) to derive the initial spec")
 			} else {
-				fmt.Fprintln(out, "existing repository detected — configure an agent, then run `respex baseline`")
+				fmt.Fprintln(out, "existing repository detected — configure an agent, then run `respex baseline` (or `--split` for a multi-file spec)")
 			}
 		} else {
 			fmt.Fprintln(out, "edit the spec, then run `respex commit` before `respex apply`")

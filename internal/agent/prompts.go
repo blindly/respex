@@ -20,6 +20,16 @@ Do not create or modify any other files.
 
 Additional intent supplied by the user: {{prompt}}`
 
+	PromptBaselineSplit = `Derive a baseline design specification for the existing repository and write it as multiple Markdown files inside the directory {{spec_path}}.
+Inspect the repository thoroughly, including documentation, source code, tests, configuration, build files, public interfaces, and platform assumptions.
+Write {{spec_path}}/SPEC.md as the master specification with exactly these sections: Intent, Scope, Non-Goals, Requirements, Features, Open Questions. The Features section must link to each feature file with a relative Markdown link.
+Write each durable product capability as {{spec_path}}/specs/<feature>.md using a lowercase hyphenated name, with these sections: Intent, Scope, Non-Goals, Requirements, Dependencies, Open Questions.
+Organize around stable product capabilities, not source directories. Create at most 8 feature files.
+Describe observable current behavior as concrete requirements. Do not invent intent or non-goals that cannot be established from evidence; put uncertainty in Open Questions.
+Do not create or modify any files outside {{spec_path}}.
+
+Additional intent supplied by the user: {{prompt}}`
+
 	PromptRefine = `Refine the design specification at {{spec_path}}.
 First read the spec, then inspect this repository to ground the critique in
 what actually exists (real file names, real constraints).
@@ -28,8 +38,10 @@ Rewrite the spec file in place. Do not modify any other files.
 Finish by summarizing the changes you made.`
 
 	PromptApply = `The repository must conform to the design specification at {{spec_path}}.
-Read the spec fully before making changes. Make the repository match the spec.
-The spec file is immutable: do not modify it.
+Read the spec fully before making changes. If the spec links to other
+specification files alongside it, read them too — they are part of the spec.
+Make the repository match the spec.
+The spec files are immutable: do not modify them.
 Finish with a short summary of the changes you made.`
 )
 

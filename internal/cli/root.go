@@ -39,6 +39,7 @@ var commands = map[string]func(args []string, out, errOut io.Writer) int{
 	"restore":    runRestore,
 	"config":     runConfig,
 	"edit":       runEdit,
+	"view":       runView,
 	"update":     runUpdate,
 	"doctor":     runDoctor,
 	"spec":       runSpec,
@@ -54,8 +55,9 @@ Usage:
 Commands:
   init       initialize Respex in the current repository
   new        compatibility alias for init
+  view       view the working or historical spec
   edit       open the spec in the configured editor
-  baseline   derive a spec from an existing repository
+  baseline   derive a spec from an existing repository (--split for multi-file)
   refine     agent critiques and rewrites the spec
   diff       diff working spec vs last commit (or two versions)
   commit     snapshot the working spec as the approved version

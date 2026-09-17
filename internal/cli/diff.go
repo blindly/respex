@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"strconv"
@@ -12,6 +13,67 @@ import (
 	"github.com/blindly/respex/internal/ui"
 )
 
+// emitDiffs prints a unified diff per bundle path. A single-file pair keeps
+// the plain from/to labels; multi-file diffs are labeled <label>:<path>.
+func emitDiffs(out, errOut io.Writer, oldFiles, newFiles []spec.File, fromLabel, toLabel string) int {
+	oldByPath := make(map[string][]byte, len(oldFiles))
+	for _, f := range oldFiles {
+		oldByPath[f.Path] = f.Content
+	}
+	newByPath := make(map[string][]byte, len(newFiles))
+	for _, f := range newFiles {
+		newByPath[f.Path] = f.Content
+	}
+	var order []string
+	seen := map[string]bool{}
+	for _, f := range oldFiles {
+		if !seen[f.Path] {
+			seen[f.Path] = true
+			order = append(order, f.Path)
+		}
+	}
+	for _, f := range newFiles {
+		if !seen[f.Path] {
+			seen[f.Path] = true
+			order = append(order, f.Path)
+		}
+	}
+	single := len(order) == 1
+	var text bytes.Buffer
+	for _, p := range order {
+		oldC, hasOld := oldByPath[p]
+		newC, hasNew := newByPath[p]
+		if hasOld && hasNew && bytes.Equal(oldC, newC) {
+			continue
+		}
+		from, to := fromLabel, toLabel
+		if !single {
+			from, to = fromLabel+":"+p, toLabel+":"+p
+		}
+		chunk, err := difflib.GetUnifiedDiffString(difflib.UnifiedDiff{
+			A:        difflib.SplitLines(string(oldC)),
+			B:        difflib.SplitLines(string(newC)),
+			FromFile: from,
+			ToFile:   to,
+			Context:  3,
+		})
+		if err != nil {
+			return fail(errOut, err)
+		}
+		text.WriteString(chunk)
+	}
+	if text.Len() == 0 {
+		fmt.Fprintln(out, "no differences")
+		return 0
+	}
+	s := text.String()
+	if ui.IsTTY(out) {
+		s = ui.ColorizeDiff(s)
+	}
+	fmt.Fprint(out, s)
+	return 0
+}
+
 func runDiff(args []string, out, errOut io.Writer) int {
 	w, err := discover()
 	if err != nil {
@@ -22,9 +84,13 @@ func runDiff(args []string, out, errOut io.Writer) int {
 		return fail(errOut, err)
 	}
 	defer st.Close()
+	master, err := spec.CleanSpecPath(w.cfg.Spec)
+	if err != nil {
+		return fail(errOut, err)
+	}
 
 	var fromLabel, toLabel string
-	var oldC, newC []byte
+	var oldFiles, newFiles []spec.File
 	if len(args) == 2 && args[0] == "--baseline" {
 		var b *state.Baseline
 		if args[1] == "latest" {
@@ -42,8 +108,17 @@ func runDiff(args []string, out, errOut io.Writer) int {
 		if err != nil {
 			return fail(errOut, err)
 		}
-		oldC, newC = b.BeforeContent, b.AfterContent
 		fromLabel, toLabel = fmt.Sprintf("baseline-%d-before", b.ID), fmt.Sprintf("baseline-%d-after", b.ID)
+		if len(b.Proposal) > 0 {
+			p, decErr := decodeProposal(b)
+			if decErr != nil {
+				return fail(errOut, decErr)
+			}
+			oldFiles, newFiles = p.Before, p.After
+		} else {
+			oldFiles = []spec.File{{Path: master, Content: b.BeforeContent}}
+			newFiles = []spec.File{{Path: master, Content: b.AfterContent}}
+		}
 	} else if len(args) == 2 && args[0] == "--refine" {
 		var r *state.Refine
 		if args[1] == "latest" {
@@ -61,7 +136,8 @@ func runDiff(args []string, out, errOut io.Writer) int {
 		if err != nil {
 			return fail(errOut, err)
 		}
-		oldC, newC = r.BeforeContent, r.AfterContent
+		oldFiles = []spec.File{{Path: master, Content: r.BeforeContent}}
+		newFiles = []spec.File{{Path: master, Content: r.AfterContent}}
 		fromLabel, toLabel = fmt.Sprintf("refine-%d-before", r.ID), fmt.Sprintf("refine-%d-after", r.ID)
 	} else {
 		switch len(args) {
@@ -73,8 +149,9 @@ func runDiff(args []string, out, errOut io.Writer) int {
 			if last == nil {
 				return fail(errOut, fmt.Errorf("no committed versions yet"))
 			}
-			oldC, fromLabel = last.Content, fmt.Sprintf("v%d", last.ID)
-			newC, err = spec.Read(w.specPath())
+			oldFiles = versionFiles(last.Content, master)
+			fromLabel = fmt.Sprintf("v%d", last.ID)
+			newFiles, err = w.readSpecFiles()
 			if err != nil {
 				return fail(errOut, err)
 			}
@@ -93,30 +170,14 @@ func runDiff(args []string, out, errOut io.Writer) int {
 			if err != nil {
 				return fail(errOut, err)
 			}
-			oldC, fromLabel = va.Content, fmt.Sprintf("v%d", va.ID)
-			newC, toLabel = vb.Content, fmt.Sprintf("v%d", vb.ID)
+			oldFiles = versionFiles(va.Content, master)
+			fromLabel = fmt.Sprintf("v%d", va.ID)
+			newFiles = versionFiles(vb.Content, master)
+			toLabel = fmt.Sprintf("v%d", vb.ID)
 		default:
 			return fail(errOut, fmt.Errorf("usage: respex diff [vA vB] | --refine <id|latest> | --baseline <id|latest>"))
 		}
 	}
 
-	text, err := difflib.GetUnifiedDiffString(difflib.UnifiedDiff{
-		A:        difflib.SplitLines(string(oldC)),
-		B:        difflib.SplitLines(string(newC)),
-		FromFile: fromLabel,
-		ToFile:   toLabel,
-		Context:  3,
-	})
-	if err != nil {
-		return fail(errOut, err)
-	}
-	if text == "" {
-		fmt.Fprintln(out, "no differences")
-		return 0
-	}
-	if ui.IsTTY(out) {
-		text = ui.ColorizeDiff(text)
-	}
-	fmt.Fprint(out, text)
-	return 0
+	return emitDiffs(out, errOut, oldFiles, newFiles, fromLabel, toLabel)
 }

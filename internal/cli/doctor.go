@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 )
 
 func runDoctor(args []string, out, errOut io.Writer) int {
@@ -69,6 +71,22 @@ func runDoctor(args []string, out, errOut io.Writer) int {
 				report("FAIL", "state", schemaErr.Error())
 			} else {
 				report("PASS", "state", fmt.Sprintf("schema v%d", schema))
+			}
+		}
+		paths, pathsErr := w.specPaths()
+		if pathsErr != nil {
+			report("FAIL", "spec files", pathsErr.Error())
+		} else {
+			missing := []string{}
+			for _, p := range paths {
+				if _, err := os.Stat(filepath.Join(w.root, filepath.FromSlash(p))); err != nil {
+					missing = append(missing, p)
+				}
+			}
+			if len(missing) > 0 {
+				report("FAIL", "spec files", "missing: "+strings.Join(missing, ", "))
+			} else {
+				report("PASS", "spec files", fmt.Sprintf("%d file(s)", len(paths)))
 			}
 		}
 		lock, locked, lockErr := tryApplyLock(filepath.Join(w.root, ".respex", "operation.lock"))

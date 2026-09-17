@@ -112,6 +112,13 @@ func runStatus(args []string, out, errOut io.Writer) int {
 	}
 	absSpec := w.absSpecPath()
 	fmt.Fprintf(display, "spec:        %s\n", absSpec)
+	specPaths, specErr := w.specPaths()
+	if specErr != nil {
+		return fail(errOut, specErr)
+	}
+	if len(specPaths) > 1 {
+		fmt.Fprintf(display, "spec files:  %d (%s)\n", len(specPaths), strings.Join(specPaths, ", "))
+	}
 	lastV, err := st.LatestVersion()
 	if err != nil {
 		return fail(errOut, err)
@@ -136,8 +143,14 @@ func runStatus(args []string, out, errOut io.Writer) int {
 		if ok {
 			applied = "yes"
 		}
-		if readErr == nil && spec.Hash(content) != lastV.Hash {
-			dirty = "yes"
+		if readErr == nil {
+			if len(specPaths) > 1 {
+				if workingHash, hashErr := w.workingSpecHash(); hashErr != nil || workingHash != lastV.Hash {
+					dirty = "yes"
+				}
+			} else if spec.Hash(content) != lastV.Hash {
+				dirty = "yes"
+			}
 		}
 	}
 	fmt.Fprintf(display, "dirty:       %s\n", dirty)
@@ -183,6 +196,9 @@ func runStatus(args []string, out, errOut io.Writer) int {
 	baselineState := "never"
 	if len(baselines) > 0 {
 		baselineState = fmt.Sprintf("%d times; last %s at %s", len(baselines), baselines[0].Outcome, baselines[0].StartedAt.Format(time.RFC3339))
+		if baselines[0].Outcome == "proposed" && len(baselines[0].Proposal) > 0 {
+			baselineState += " — split proposal pending; `respex baseline accept` or `respex baseline discard`"
+		}
 	}
 	fmt.Fprintf(display, "baselined:   %s\n", baselineState)
 	refineState := "ready"

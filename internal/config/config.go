@@ -32,7 +32,9 @@ type Prompts struct {
 // prompt overrides.
 type Config struct {
 	Spec         string        `toml:"spec"`
+	SpecFiles    []string      `toml:"spec_files"`
 	Editor       []string      `toml:"editor"`
+	Pager        []string      `toml:"pager"`
 	AgentTimeout time.Duration `toml:"-"`
 	Agent        Agent         `toml:"agent"`
 	Prompts      Prompts       `toml:"prompts"`
@@ -40,7 +42,9 @@ type Config struct {
 
 type fileConfig struct {
 	Spec         string   `toml:"spec"`
+	SpecFiles    []string `toml:"spec_files"`
 	Editor       []string `toml:"editor"`
+	Pager        []string `toml:"pager"`
 	AgentTimeout string   `toml:"agent_timeout"`
 	ApplyTimeout string   `toml:"apply_timeout"`
 	Agent        Agent    `toml:"agent"`
@@ -74,7 +78,7 @@ func Load(globalPath, projectPath string) (Config, error) {
 		if err := toml.NewDecoder(bytes.NewReader(b)).DisallowUnknownFields().Decode(&raw); err != nil {
 			return Config{}, fmt.Errorf("parse config %s: %w", p, err)
 		}
-		c := Config{Spec: raw.Spec, Editor: raw.Editor, Agent: raw.Agent, Prompts: raw.Prompts}
+		c := Config{Spec: raw.Spec, SpecFiles: raw.SpecFiles, Editor: raw.Editor, Pager: raw.Pager, Agent: raw.Agent, Prompts: raw.Prompts}
 		timeoutRaw := raw.AgentTimeout
 		if timeoutRaw == "" {
 			timeoutRaw = raw.ApplyTimeout
@@ -94,8 +98,14 @@ func merge(dst *Config, src Config) {
 	if src.Spec != "" {
 		dst.Spec = src.Spec
 	}
+	if len(src.SpecFiles) > 0 {
+		dst.SpecFiles = src.SpecFiles
+	}
 	if len(src.Editor) > 0 {
 		dst.Editor = src.Editor
+	}
+	if len(src.Pager) > 0 {
+		dst.Pager = src.Pager
 	}
 	if src.AgentTimeout > 0 {
 		dst.AgentTimeout = src.AgentTimeout

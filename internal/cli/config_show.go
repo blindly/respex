@@ -108,7 +108,8 @@ func runConfigShow(out, errOut io.Writer, jsonOutput bool) int {
 			return map[string]any{"value": v, "source": configSource(userKeys, projectKeys, section, key)}
 		}
 		payload := map[string]any{
-			"spec": value(cfg.Spec, "", "spec"), "editor": value(cfg.Editor, "", "editor"),
+			"spec": value(cfg.Spec, "", "spec"), "spec_files": value(cfg.SpecFiles, "", "spec_files"),
+			"editor": value(cfg.Editor, "", "editor"), "pager": value(cfg.Pager, "", "pager"),
 			"agent_timeout": value(cfg.AgentTimeout.String(), "", "agent_timeout"),
 			"agent_command": value(cfg.Agent.Command, "agent", "command"), "agent_delivery": value(cfg.Agent.Delivery, "agent", "delivery"),
 			"agent_env": value(redactEnv(cfg.Agent.Env), "agent", "env"),
@@ -119,7 +120,13 @@ func runConfigShow(out, errOut io.Writer, jsonOutput bool) int {
 		return 0
 	}
 	fmt.Fprintf(out, "spec:          %s  (%s)\n", cfg.Spec, configSource(userKeys, projectKeys, "", "spec"))
+	specFiles := formatArgv(cfg.SpecFiles)
+	if len(cfg.SpecFiles) == 0 {
+		specFiles = "(none)"
+	}
+	fmt.Fprintf(out, "spec_files:    %s  (%s)\n", specFiles, configSource(userKeys, projectKeys, "", "spec_files"))
 	fmt.Fprintf(out, "editor:        %s  (%s)\n", formatArgv(cfg.Editor), configSource(userKeys, projectKeys, "", "editor"))
+	fmt.Fprintf(out, "pager:         %s  (%s)\n", formatArgv(cfg.Pager), configSource(userKeys, projectKeys, "", "pager"))
 	fmt.Fprintf(out, "agent_timeout: %s  (%s)\n", cfg.AgentTimeout, configSource(userKeys, projectKeys, "", "agent_timeout"))
 	fmt.Fprintf(out, "agent.command: %s  (%s)\n", formatArgv(cfg.Agent.Command), configSource(userKeys, projectKeys, "agent", "command"))
 	fmt.Fprintf(out, "agent.delivery: %s  (%s)\n", cfg.Agent.Delivery, configSource(userKeys, projectKeys, "agent", "delivery"))

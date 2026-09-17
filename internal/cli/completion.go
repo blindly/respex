@@ -5,7 +5,7 @@ import (
 	"io"
 )
 
-const commandNames = "init new edit baseline refine diff commit apply log status restore config update doctor spec completion"
+const commandNames = "init new view edit baseline refine diff commit apply log status restore config update doctor spec completion"
 
 func runCompletion(args []string, out, errOut io.Writer) int {
 	if len(args) != 1 {

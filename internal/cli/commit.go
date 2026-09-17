@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"io"
 	"time"
-
-	"github.com/blindly/respex/internal/spec"
 )
 
 func runCommit(args []string, out, errOut io.Writer) int {
@@ -22,7 +20,7 @@ func runCommit(args []string, out, errOut io.Writer) int {
 	if err != nil {
 		return fail(errOut, err)
 	}
-	content, err := spec.Read(w.specPath())
+	files, err := w.readSpecFiles()
 	if err != nil {
 		return fail(errOut, err)
 	}
@@ -31,15 +29,19 @@ func runCommit(args []string, out, errOut io.Writer) int {
 		return fail(errOut, err)
 	}
 	defer st.Close()
-	h := spec.Hash(content)
+	stored, h := storedSpecContent(files)
 	if last, err := st.LatestVersion(); err != nil {
 		return fail(errOut, err)
 	} else if last != nil && last.Hash == h {
 		fmt.Fprintln(out, "warning: spec content is unchanged; committing anyway")
 	}
-	id, err := st.InsertVersion(h, content, *msg, time.Now())
+	id, err := st.InsertVersion(h, stored, *msg, time.Now())
 	if err != nil {
 		return fail(errOut, err)
+	}
+	if len(files) > 1 {
+		fmt.Fprintf(out, "committed v%d (%s…, %d spec files)\n", id, h[:8], len(files))
+		return 0
 	}
 	fmt.Fprintf(out, "committed v%d (%s…)\n", id, h[:8])
 	return 0

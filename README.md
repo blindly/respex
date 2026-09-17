@@ -30,6 +30,7 @@ go build .
 ## Quick start
 
     respex init "a CLI that converts CSV to JSON"   # scaffold + agent-drafted spec
+    respex view                                     # view the configured spec
     respex edit                                     # open SPEC.md in your editor
     respex refine                                   # agent improves the spec (repo-aware)
     respex diff --refine latest                     # review exactly what the agent changed
@@ -53,6 +54,42 @@ The agent preserves established intent and records conflicts as open questions.
 Draft, baseline, and refine operate on temporary candidates; `SPEC.md` is replaced
 only after the agent succeeds. Apply always receives an immutable copy of the
 committed spec, so external edits cannot change what a running apply implements.
+
+### Multi-file specs
+
+Larger codebases can split the spec into a bundle: `SPEC.md` stays the master
+document (intent, scope, invariants, and a feature index) while durable product
+capabilities live under `specs/`:
+
+```text
+SPEC.md
+specs/authentication.md
+specs/billing.md
+```
+
+`respex baseline --split` asks the agent to propose this layout inside
+`.respex/proposals/` without touching the live spec. Review the whole proposal,
+then accept or discard it:
+
+```text
+respex baseline --split --intent "what this project is meant to accomplish"
+respex diff --baseline latest        # per-file diff of the proposal
+respex baseline accept               # install files + configure spec_files
+respex baseline discard              # drop the proposal
+```
+
+Accept refuses to run if any target file changed since the proposal was
+generated, then writes `spec_files` into `.respex/config.toml`:
+
+```toml
+spec = "SPEC.md"
+spec_files = ["specs/authentication.md", "specs/billing.md"]
+```
+
+Once configured, `commit` snapshots the whole bundle atomically, `diff`
+compares it file by file, `status` and `doctor` track every file, and `apply`
+hands the agent an immutable copy of the entire bundle. `view`, `edit`,
+`refine`, and `restore` operate on the master spec.
 
 Edit `SPEC.md` by hand any time; `commit` snapshots whatever is there.
 
@@ -78,7 +115,9 @@ The user config provides defaults for every project. `.respex/config.toml`
 
 ```toml
 spec = "SPEC.md"
+spec_files = []                            # extra bundle files, e.g. specs/billing.md
 editor = ["code", "--wait"]                # optional editor argv
+pager = ["less", "-FRX"]                   # optional pager argv
 agent_timeout = "1h"                       # hard limit; Go duration syntax
 
 [agent]
@@ -97,6 +136,15 @@ command = ["claude", "-p", "{{prompt}}"]
 
 `respex edit` uses the configured editor array, then `VISUAL`, then `EDITOR`,
 and finally Notepad on Windows. GUI editors should include their wait argument.
+`respex view` uses the configured pager, then `PAGER`, then `less`/`more`; pipes
+and redirects always receive exact Markdown without decoration. Historical views:
+
+```text
+respex view --version 3
+respex view --refine latest --before
+respex view --baseline 2 --after
+respex view --raw
+```
 
 Other user-level settings continue to be inherited. Placeholders: `{{prompt}}`
 (instruction text) and `{{spec_path}}` (spec file path).

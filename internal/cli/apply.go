@@ -32,7 +32,7 @@ func runApply(args []string, out, errOut io.Writer) int {
 	if err != nil {
 		return fail(errOut, err)
 	}
-	content, err := spec.Read(w.specPath())
+	workingHash, err := w.workingSpecHash()
 	if err != nil {
 		return fail(errOut, err)
 	}
@@ -49,7 +49,7 @@ func runApply(args []string, out, errOut io.Writer) int {
 	if last == nil {
 		return fail(errOut, fmt.Errorf("no committed versions yet — run `respex commit`"))
 	}
-	if spec.Hash(content) != last.Hash {
+	if workingHash != last.Hash {
 		return fail(errOut, fmt.Errorf(
 			"spec changed since last commit — review with `respex diff`, then `respex commit`"))
 	}
@@ -101,14 +101,15 @@ func runApply(args []string, out, errOut io.Writer) int {
 	if w.cfg.Prompts.Apply != "" {
 		tmpl = w.cfg.Prompts.Apply
 	}
-	absSpec, cleanupSpec, err := createSpecCandidate(w.root, last.Content)
+	master, err := spec.CleanSpecPath(w.cfg.Spec)
+	if err != nil {
+		return fail(errOut, err)
+	}
+	absSpec, cleanupSpec, err := materializeSnapshot(w.root, last.ID, versionFiles(last.Content, master))
 	if err != nil {
 		return fail(errOut, err)
 	}
 	defer cleanupSpec()
-	if err := os.Chmod(absSpec, 0o444); err != nil {
-		return fail(errOut, err)
-	}
 	instr := agent.Expand(tmpl, "", absSpec)
 
 	logsDir := filepath.Join(w.root, ".respex", "logs")

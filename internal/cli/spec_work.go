@@ -53,25 +53,34 @@ func installSpecCandidate(livePath, candidatePath string, expectedLive []byte) (
 	if err != nil {
 		return nil, err
 	}
-	tmp, err := os.CreateTemp(filepath.Dir(livePath), ".respex-spec-*")
-	if err != nil {
+	if err := writeFileAtomic(livePath, content); err != nil {
 		return nil, err
+	}
+	return content, nil
+}
+
+// writeFileAtomic writes content to path via a same-directory temp file and
+// an atomic rename, creating parent directories as needed.
+func writeFileAtomic(path string, content []byte) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".respex-spec-*")
+	if err != nil {
+		return err
 	}
 	tmpPath := tmp.Name()
 	defer os.Remove(tmpPath)
 	if _, err := tmp.Write(content); err != nil {
 		tmp.Close()
-		return nil, err
+		return err
 	}
 	if err := tmp.Chmod(0o644); err != nil {
 		tmp.Close()
-		return nil, err
+		return err
 	}
 	if err := tmp.Close(); err != nil {
-		return nil, err
+		return err
 	}
-	if err := replaceFile(tmpPath, livePath); err != nil {
-		return nil, err
-	}
-	return content, nil
+	return replaceFile(tmpPath, path)
 }
