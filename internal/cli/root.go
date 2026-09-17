@@ -38,6 +38,7 @@ var commands = map[string]func(args []string, out, errOut io.Writer) int{
 	"status":     runStatus,
 	"restore":    runRestore,
 	"config":     runConfig,
+	"notes":      runNotes,
 	"edit":       runEdit,
 	"view":       runView,
 	"update":     runUpdate,
@@ -67,6 +68,7 @@ Commands:
   status     summarize spec and state
   restore    restore a saved refinement before-state
   config     initialize, edit, validate, or show configuration
+  notes      scratchpad for ideas not yet in the spec
   update     securely update the respex binary
   doctor     diagnose configuration and project health
   spec       validate the working specification or list open questions

@@ -109,6 +109,7 @@ func runConfigShow(out, errOut io.Writer, jsonOutput bool) int {
 		}
 		payload := map[string]any{
 			"spec": value(cfg.Spec, "", "spec"), "spec_files": value(cfg.SpecFiles, "", "spec_files"),
+			"notes":  value(cfg.Notes, "", "notes"),
 			"editor": value(cfg.Editor, "", "editor"), "pager": value(cfg.Pager, "", "pager"),
 			"agent_timeout": value(cfg.AgentTimeout.String(), "", "agent_timeout"),
 			"agent_command": value(cfg.Agent.Command, "agent", "command"), "agent_delivery": value(cfg.Agent.Delivery, "agent", "delivery"),
@@ -125,6 +126,7 @@ func runConfigShow(out, errOut io.Writer, jsonOutput bool) int {
 		specFiles = "(none)"
 	}
 	fmt.Fprintf(out, "spec_files:    %s  (%s)\n", specFiles, configSource(userKeys, projectKeys, "", "spec_files"))
+	fmt.Fprintf(out, "notes:         %s  (%s)\n", cfg.Notes, configSource(userKeys, projectKeys, "", "notes"))
 	fmt.Fprintf(out, "editor:        %s  (%s)\n", formatArgv(cfg.Editor), configSource(userKeys, projectKeys, "", "editor"))
 	fmt.Fprintf(out, "pager:         %s  (%s)\n", formatArgv(cfg.Pager), configSource(userKeys, projectKeys, "", "pager"))
 	fmt.Fprintf(out, "agent_timeout: %s  (%s)\n", cfg.AgentTimeout, configSource(userKeys, projectKeys, "", "agent_timeout"))

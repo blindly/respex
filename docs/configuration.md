@@ -40,6 +40,7 @@ respex config show --json
 ```toml
 spec = "SPEC.md"
 spec_files = []                            # extra bundle files for large projects
+notes = ".respex/notes.md"                   # scratchpad for ideas not yet in the spec
 editor = ["code", "--wait"]                # optional editor argv
 pager = ["less", "-FRX"]                   # optional pager argv
 agent_timeout = "1h"                         # hard limit; Go duration syntax

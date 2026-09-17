@@ -25,6 +25,7 @@ func runRefine(args []string, out, errOut io.Writer) int {
 	fs := newFlagSet("refine", errOut)
 	noProgress := fs.Bool("no-progress", false, "disable the interactive progress indicator")
 	force := fs.Bool("force", false, "run even when refinement is likely to be a no-op")
+	withNotes := fs.Bool("notes", false, "also read project notes as context")
 
 	// Allow the optional feature name to appear before or after boolean flags.
 	featureName := ""
@@ -150,6 +151,12 @@ func runRefine(args []string, out, errOut io.Writer) int {
 	instr := agent.Expand(tmpl, "", absSpec)
 	if targetPath != "" {
 		instr += fmt.Sprintf("\n\nThe master spec at %s provides project-wide context. Read it, but do not modify it. Rewrite only the feature spec at %s.", w.absSpecPath(), absSpec)
+	}
+	if *withNotes {
+		notesPath := w.notesPath()
+		if _, err := os.Stat(notesPath); err == nil {
+			instr += fmt.Sprintf("\n\nAlso read the project notes at %s for additional context and ideas. Incorporate anything that is ready into the spec, but leave unresolved ideas in the notes file.", notesPath)
+		}
 	}
 	code, err := a.Execute(ctx, instr, absSpec, f)
 	progress.Stop()

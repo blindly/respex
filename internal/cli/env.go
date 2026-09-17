@@ -63,6 +63,9 @@ func loadConfig(root string) (config.Config, error) {
 // absolute path is joined textually per spec §3 root-anchoring.
 func (w *workspace) specPath() string { return filepath.Join(w.root, w.cfg.Spec) }
 
+// notesPath joins cfg.Notes under root. The default is .respex/notes.md.
+func (w *workspace) notesPath() string { return filepath.Join(w.root, w.cfg.Notes) }
+
 func (w *workspace) openState() (*state.DB, error) {
 	return state.Open(filepath.Join(w.root, ".respex", "state.db"))
 }

@@ -18,9 +18,13 @@ Resolving them is a human job.
 - During `respex refine`, if the agent surfaces an ambiguity but cannot choose
   the answer without domain knowledge.
 
+For raw ideas that are not yet ready for an Open Question section, use
+`respex notes add` instead of editing the spec.
+
 ## The resolution loop
 
 ```text
+respex notes add "..."      # capture half-formed ideas without touching the spec
 respex spec questions       # see every open question in the bundle
 respex edit                 # answer the blocking ones
 respex diff                 # review what changed

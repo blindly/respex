@@ -40,11 +40,12 @@ respex view --raw
 Open `SPEC.md` or the named feature spec in the configured editor and wait for
 it to close.
 
-### `respex refine [--force] [--no-progress] [feature]`
+### `respex refine [--force] [--no-progress] [--notes] [feature]`
 Run the agent to critique and improve the spec. In a multi-file project, pass a
 feature name to refine only that feature spec; the agent reads the master spec
 for context but must not change it. Rejected as a no-op when the spec is still the
 generated skeleton or when the same spec/prompt/agent was last refined unchanged.
+Use `--notes` to also pass the project notes file as context.
 
 ### `respex diff [vA vB] | --refine <id|latest> | --baseline <id|latest>`
 Show a unified diff of two committed versions, a refinement, or a baseline.
@@ -71,6 +72,20 @@ agent configuration. Also reports pending split baseline proposals.
 ### `respex restore <--refine|--baseline> <id|latest> --before`
 Restore the working spec to the before-state of a refinement or baseline.
 Creates a reversible history entry.
+
+### `respex notes <show|add|edit|clear>`
+A project scratchpad for ideas that are not yet part of the spec.
+
+```text
+respex notes
+respex notes add "explore dark mode"
+respex notes edit
+respex notes clear
+```
+
+Notes live at `.respex/notes.md` by default (set `notes` in config to change the
+path). They are not committed with the spec and are ignored by `respex check`.
+Use `respex refine --notes` to let the agent read them as context.
 
 ## Baseline
 

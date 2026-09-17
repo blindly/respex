@@ -22,6 +22,7 @@ const configTemplate = `# respex configuration
 # spec = "SPEC.md"
 # Additional spec files committed/applied alongside the master spec:
 # spec_files = ["specs/authentication.md", "specs/billing.md"]
+# notes = ".respex/notes.md"
 # editor = ["code", "--wait"]
 # pager = ["less", "-FRX"]
 # agent_timeout = "1h"

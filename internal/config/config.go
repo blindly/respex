@@ -33,6 +33,7 @@ type Prompts struct {
 type Config struct {
 	Spec         string        `toml:"spec"`
 	SpecFiles    []string      `toml:"spec_files"`
+	Notes        string        `toml:"notes"`
 	Editor       []string      `toml:"editor"`
 	Pager        []string      `toml:"pager"`
 	AgentTimeout time.Duration `toml:"-"`
@@ -43,6 +44,7 @@ type Config struct {
 type fileConfig struct {
 	Spec         string   `toml:"spec"`
 	SpecFiles    []string `toml:"spec_files"`
+	Notes        string   `toml:"notes"`
 	Editor       []string `toml:"editor"`
 	Pager        []string `toml:"pager"`
 	AgentTimeout string   `toml:"agent_timeout"`
@@ -53,7 +55,7 @@ type fileConfig struct {
 
 // Defaults returns the built-in configuration.
 func Defaults() Config {
-	return Config{Spec: "SPEC.md", AgentTimeout: time.Hour, Agent: Agent{Delivery: "argv"}}
+	return Config{Spec: "SPEC.md", Notes: ".respex/notes.md", AgentTimeout: time.Hour, Agent: Agent{Delivery: "argv"}}
 }
 
 // Load merges global (optional) then project (optional) files over Defaults:
@@ -78,7 +80,7 @@ func Load(globalPath, projectPath string) (Config, error) {
 		if err := toml.NewDecoder(bytes.NewReader(b)).DisallowUnknownFields().Decode(&raw); err != nil {
 			return Config{}, fmt.Errorf("parse config %s: %w", p, err)
 		}
-		c := Config{Spec: raw.Spec, SpecFiles: raw.SpecFiles, Editor: raw.Editor, Pager: raw.Pager, Agent: raw.Agent, Prompts: raw.Prompts}
+		c := Config{Spec: raw.Spec, SpecFiles: raw.SpecFiles, Notes: raw.Notes, Editor: raw.Editor, Pager: raw.Pager, Agent: raw.Agent, Prompts: raw.Prompts}
 		timeoutRaw := raw.AgentTimeout
 		if timeoutRaw == "" {
 			timeoutRaw = raw.ApplyTimeout
@@ -100,6 +102,9 @@ func merge(dst *Config, src Config) {
 	}
 	if len(src.SpecFiles) > 0 {
 		dst.SpecFiles = src.SpecFiles
+	}
+	if src.Notes != "" {
+		dst.Notes = src.Notes
 	}
 	if len(src.Editor) > 0 {
 		dst.Editor = src.Editor
