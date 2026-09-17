@@ -45,17 +45,17 @@ pager = ["less", "-FRX"]                   # optional pager argv
 agent_timeout = "1h"                         # hard limit; Go duration syntax
 
 [agent]
-command = ["claude", "-p", "{{prompt}}"]   # argv array — any agentic CLI
-# command = ["devin", "--print", "{{prompt}}"]
-# command = ["codex", "exec", "{{prompt}}"]
-# command = ["gemini", "-p", "{{prompt}}"]
-# command = ["opencode", "run", "{{prompt}}"]
+command = ["claude", "-p", "{% raw %}{{prompt}}{% endraw %}"]   # argv array — any agentic CLI
+# command = ["devin", "--print", "{% raw %}{{prompt}}{% endraw %}"]
+# command = ["codex", "exec", "{% raw %}{{prompt}}{% endraw %}"]
+# command = ["gemini", "-p", "{% raw %}{{prompt}}{% endraw %}"]
+# command = ["opencode", "run", "{% raw %}{{prompt}}{% endraw %}"]
 delivery = "argv"                            # or "stdin" for long prompts
 env = []
 
 [prompts]
-# Optional overrides for built-in prompts. {{prompt}} carries the description for
-# draft/baseline; {{spec_path}} is replaced with the spec file or directory.
+# Optional overrides for built-in prompts. {% raw %}{{prompt}}{% endraw %} carries the description for
+# draft/baseline; {% raw %}{{spec_path}}{% endraw %} is replaced with the spec file or directory.
 # draft    = "..."
 # baseline = "..."
 # refine   = "..."
@@ -77,7 +77,7 @@ Agent CLIs must run non-interactively. For Devin CLI, use:
 
 ```toml
 [agent]
-command = ["devin", "--print", "{{prompt}}"]
+command = ["devin", "--print", "{% raw %}{{prompt}}{% endraw %}"]
 ```
 
 Success means exit code 0. Output is captured under `.respex/logs/`. Interactive
