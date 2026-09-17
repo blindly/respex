@@ -1,5 +1,6 @@
 /respex
 /respex.exe
 /.respex/
+/.txt/
 testdata/fakeagent/fakeagent
 testdata/fakeagent/fakeagent.exe
