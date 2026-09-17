@@ -109,6 +109,12 @@ git diff
 
 `respex apply` skips work that is already applied.
 
+## Open Questions
+
+If your spec has an `## Open Questions` section, resolve the blocking ones
+before applying. See the [Open Questions workflow](open-questions/) page for the
+full pattern.
+
 ## Multi-file projects
 
 When `spec_files` is configured, you can work on one capability at a time:
