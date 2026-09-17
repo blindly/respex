@@ -109,8 +109,11 @@ respex config show [--json]
 Secure self-update from GitHub Releases. Verifies the SHA-256 checksum before
 replacing the binary.
 
-### `respex doctor [--json]`
+### `respex doctor [--json] [--agent-check]`
 Diagnose configuration, project, tools, state, operation lock, and version.
+The `agent` check validates that the configured agent binary exists and that
+its command template uses supported placeholders correctly. Add `--agent-check`
+to also run a short test prompt through the agent and verify it responds.
 
 ### `respex spec validate`
 Check that the working spec has the required sections: Intent, Scope,

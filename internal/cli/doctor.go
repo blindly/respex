@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,18 +10,26 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
+
+	"github.com/blindly/respex/internal/agent"
 )
 
 func runDoctor(args []string, out, errOut io.Writer) int {
-	jsonOutput := len(args) == 1 && args[0] == "--json"
-	if len(args) != 0 && !jsonOutput {
-		return fail(errOut, errors.New("usage: respex doctor [--json]"))
+	fs := newFlagSet("doctor", errOut)
+	jsonOutput := fs.Bool("json", false, "output results as JSON")
+	agentCheck := fs.Bool("agent-check", false, "run a short test prompt through the configured agent")
+	if err := fs.Parse(args); err != nil {
+		return fail(errOut, err)
+	}
+	if fs.NArg() != 0 {
+		return fail(errOut, errors.New("usage: respex doctor [--json] [--agent-check]"))
 	}
 	failed := false
 	var checks []map[string]string
 	report := func(status, name, detail string) {
 		checks = append(checks, map[string]string{"status": status, "name": name, "detail": detail})
-		if !jsonOutput {
+		if !*jsonOutput {
 			fmt.Fprintf(out, "%-4s  %-12s %s\n", status, name, detail)
 		}
 		if status == "FAIL" {
@@ -52,7 +61,40 @@ func runDoctor(args []string, out, errOut io.Writer) int {
 		} else if path, err := exec.LookPath(w.cfg.Agent.Command[0]); err != nil {
 			report("FAIL", "agent", err.Error())
 		} else {
-			report("PASS", "agent", path)
+			delivery := w.cfg.Agent.Delivery
+			if delivery == "" {
+				delivery = agent.DeliveryArgv
+			}
+			_, _, buildErr := agent.Build(w.cfg.Agent.Command, delivery, "doctor probe", filepath.Join(w.root, "SPEC.md"))
+			if buildErr != nil {
+				report("FAIL", "agent", buildErr.Error())
+			} else if *agentCheck {
+				a := agent.Adapter{Command: w.cfg.Agent.Command, Delivery: delivery, Env: w.cfg.Agent.Env, Dir: w.root}
+				tmpDir := filepath.Join(w.root, ".respex", "tmp")
+				if err := os.MkdirAll(tmpDir, 0o755); err != nil {
+					report("FAIL", "agent-check", fmt.Sprintf("create tmp dir: %v", err))
+				} else {
+					tmp, err := os.CreateTemp(tmpDir, "doctor-agent-check-*.log")
+					if err != nil {
+						report("FAIL", "agent-check", fmt.Sprintf("create temp log: %v", err))
+					} else {
+						defer tmp.Close()
+						defer os.Remove(tmp.Name())
+						ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+						code, err := a.Execute(ctx, "Reply with only the word OK to confirm the agent CLI is reachable.", filepath.Join(w.root, "SPEC.md"), tmp)
+						cancel()
+						if err != nil {
+							report("FAIL", "agent-check", err.Error())
+						} else if code != 0 {
+							report("FAIL", "agent-check", fmt.Sprintf("exit %d", code))
+						} else {
+							report("PASS", "agent-check", "agent responded to test prompt")
+						}
+					}
+				}
+			} else {
+				report("PASS", "agent", path)
+			}
 		}
 		if editor, err := resolveEditor(w.cfg.Editor); err != nil {
 			report("WARN", "editor", err.Error())
@@ -100,13 +142,13 @@ func runDoctor(args []string, out, errOut io.Writer) int {
 		}
 	}
 	report("PASS", "version", version)
-	if jsonOutput {
+	if *jsonOutput {
 		if err := json.NewEncoder(out).Encode(map[string]any{"ok": !failed, "checks": checks}); err != nil {
 			return fail(errOut, err)
 		}
 	}
 	if failed {
-		if !jsonOutput {
+		if !*jsonOutput {
 			fmt.Fprintln(errOut, "respex: doctor found failures")
 		}
 		return 1
