@@ -53,6 +53,7 @@ respex apply          # → "nothing to do (v1 already applied)"
 ## Next steps
 
 - [Getting started](getting-started.md) — initialize, baseline, and iterate.
+- [End-to-end process](end-to-end.md) — the complete lifecycle and when to use each command.
 - [Configuration](configuration.md) — user and project settings.
 - [Commands](commands.md) — full command reference.
 - [Workflows](workflows.md) — `refine`, `baseline`, `apply`, and rollback patterns.
