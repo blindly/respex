@@ -89,7 +89,7 @@ func runRestore(args []string, out, errOut io.Writer) int {
 	if _, err := installSpecCandidate(w.specPath(), candidate, current); err != nil {
 		return fail(errOut, fmt.Errorf("restore spec: %w", err))
 	}
-	restoreID, err := st.InsertRefine("respex", "restored", spec.Hash(current), spec.Hash(before), current, before, "", "", started, time.Now())
+	restoreID, err := st.InsertRefine("respex", "restored", spec.Hash(current), spec.Hash(before), current, before, "", "", "", started, time.Now())
 	if err != nil {
 		rollback, cleanupRollback, createErr := createSpecCandidate(w.root, current)
 		if createErr == nil {

@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strconv"
 
@@ -55,14 +56,20 @@ func runView(args []string, out, errOut io.Writer) int {
 	if err := fs.Parse(args); err != nil {
 		return fail(errOut, err)
 	}
-	if fs.NArg() != 0 {
-		return fail(errOut, fmt.Errorf("unexpected argument %q — usage: respex view [--raw] [--version id | --refine id --before|--after | --baseline id --before|--after]", fs.Arg(0)))
+	featureName := ""
+	if fs.NArg() == 1 {
+		featureName = fs.Arg(0)
+	} else if fs.NArg() > 1 {
+		return fail(errOut, errors.New("usage: respex view [feature] [--raw] [--version id | --refine id --before|--after | --baseline id --before|--after]"))
 	}
 	sources := 0
 	for _, selected := range []bool{*versionID != 0, *refineID != "", *baselineID != ""} {
 		if selected {
 			sources++
 		}
+	}
+	if featureName != "" && sources > 0 {
+		return fail(errOut, errors.New("select either a feature name or a snapshot, not both"))
 	}
 	if sources > 1 || ((*before || *after) && *refineID == "" && *baselineID == "") || (*before && *after) {
 		return fail(errOut, errors.New("select one version, refinement, or baseline snapshot"))
@@ -74,9 +81,20 @@ func runView(args []string, out, errOut io.Writer) int {
 	if err != nil {
 		return fail(errOut, err)
 	}
+	featurePath := ""
+	if featureName != "" {
+		featurePath, err = w.resolveFeature(featureName)
+		if err != nil {
+			return fail(errOut, err)
+		}
+	}
 	var content []byte
 	if sources == 0 {
-		content, err = spec.Read(w.specPath())
+		if featurePath == "" {
+			content, err = spec.Read(w.specPath())
+		} else {
+			content, err = spec.Read(filepath.Join(w.root, featurePath))
+		}
 	} else {
 		st, openErr := w.openState()
 		if openErr != nil {

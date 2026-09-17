@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"path"
 	"path/filepath"
 	"time"
 
@@ -24,11 +25,22 @@ func runApply(args []string, out, errOut io.Writer) int {
 	if err := fs.Parse(args); err != nil {
 		return fail(errOut, err)
 	}
-	if fs.NArg() != 0 {
-		return fail(errOut, fmt.Errorf("unexpected argument %q — usage: respex apply [--agent tpl] [--no-progress]", fs.Arg(0)))
+	if fs.NArg() > 1 {
+		return fail(errOut, errors.New("usage: respex apply [--agent tpl] [--no-progress] [feature]"))
+	}
+	featureName := ""
+	if fs.NArg() == 1 {
+		featureName = fs.Arg(0)
 	}
 
 	w, err := discover()
+	if err != nil {
+		return fail(errOut, err)
+	}
+	if featureName != "" && len(w.cfg.SpecFiles) == 0 {
+		return fail(errOut, fmt.Errorf("unexpected argument %q — usage: respex apply [--agent tpl] [--no-progress]", featureName))
+	}
+	featurePath, err := w.resolveFeature(featureName)
 	if err != nil {
 		return fail(errOut, err)
 	}
@@ -61,13 +73,28 @@ func runApply(args []string, out, errOut io.Writer) int {
 		return fail(errOut, errors.New("another apply, baseline, refine, restore, or edit is already running in this project"))
 	}
 	defer lock.Close()
-	applied, err := st.IsApplied(last.ID)
-	if err != nil {
-		return fail(errOut, err)
+	featureLabel := ""
+	if featurePath != "" {
+		featureLabel = path.Base(featurePath)
 	}
-	if applied {
-		fmt.Fprintf(out, "nothing to do (v%d already applied)\n", last.ID)
-		return 0
+	if featurePath == "" {
+		applied, err := st.IsApplied(last.ID)
+		if err != nil {
+			return fail(errOut, err)
+		}
+		if applied {
+			fmt.Fprintf(out, "nothing to do (v%d already applied)\n", last.ID)
+			return 0
+		}
+	} else {
+		applied, err := st.IsFeatureApplied(last.ID, featurePath)
+		if err != nil {
+			return fail(errOut, err)
+		}
+		if applied {
+			fmt.Fprintf(out, "nothing to do (feature %s of v%d already applied)\n", featureLabel, last.ID)
+			return 0
+		}
 	}
 	if unfinished, err := st.HasUnfinishedApply(); err != nil {
 		return fail(errOut, err)
@@ -111,12 +138,18 @@ func runApply(args []string, out, errOut io.Writer) int {
 	}
 	defer cleanupSpec()
 	instr := agent.Expand(tmpl, "", absSpec)
+	featureSnapPath := ""
+	if featurePath != "" {
+		featureSnapPath = filepath.Join(absSpec, featurePath)
+		masterSnapPath := filepath.Join(absSpec, master)
+		instr = agent.Expand(agent.PromptApplyFeature, "", featureSnapPath, masterSnapPath)
+	}
 
 	logsDir := filepath.Join(w.root, ".respex", "logs")
 	if err := os.MkdirAll(logsDir, 0o755); err != nil {
 		return fail(errOut, err)
 	}
-	id, err := st.InsertApply(last.ID, tpl[0], time.Now())
+	id, err := st.InsertApply(last.ID, tpl[0], featurePath, time.Now())
 	if err != nil {
 		return fail(errOut, err)
 	}
@@ -137,6 +170,9 @@ func runApply(args []string, out, errOut io.Writer) int {
 	defer f.Close()
 
 	label := fmt.Sprintf("applying v%d via %s", last.ID, tpl[0])
+	if featurePath != "" {
+		label = fmt.Sprintf("applying feature %s of v%d via %s", featureLabel, last.ID, tpl[0])
+	}
 	progressEnabled := ui.IsTTY(out) && !*noProgress && os.Getenv("NO_COLOR") == ""
 	if !progressEnabled {
 		fmt.Fprintf(out, "%s; output: %s\n", label, logRel)
@@ -174,10 +210,18 @@ func runApply(args []string, out, errOut io.Writer) int {
 		return fail(errOut, err)
 	}
 	if code != 0 {
+		if featurePath != "" {
+			return fail(errOut, fmt.Errorf("apply feature %s of v%d failed (exit %d) — log: %s", featureLabel, last.ID, code, logRel))
+		}
 		return fail(errOut, fmt.Errorf("apply v%d failed (exit %d) — log: %s", last.ID, code, logRel))
 	}
-	fmt.Fprintf(out, "applied v%d via %s in %s — log: %s\n",
-		last.ID, tpl[0], time.Since(start).Round(time.Second), logRel)
+	if featurePath != "" {
+		fmt.Fprintf(out, "applied feature %s of v%d via %s in %s — log: %s\n",
+			featureLabel, last.ID, tpl[0], time.Since(start).Round(time.Second), logRel)
+	} else {
+		fmt.Fprintf(out, "applied v%d via %s in %s — log: %s\n",
+			last.ID, tpl[0], time.Since(start).Round(time.Second), logRel)
+	}
 	if fi, err := os.Stat(filepath.Join(w.root, ".git")); err == nil && fi.IsDir() {
 		fmt.Fprintln(out, "review the changes with `git diff`, then commit")
 	}

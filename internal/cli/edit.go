@@ -63,12 +63,25 @@ func resolveEditor(configured []string) ([]string, error) {
 }
 
 func runEdit(args []string, out, errOut io.Writer) int {
-	if len(args) != 0 {
-		return fail(errOut, fmt.Errorf("unexpected argument %q — usage: respex edit", args[0]))
+	featureName := ""
+	if len(args) == 1 {
+		featureName = args[0]
+	} else if len(args) > 1 {
+		return fail(errOut, errors.New("usage: respex edit [feature]"))
 	}
 	w, err := discover()
 	if err != nil {
 		return fail(errOut, err)
+	}
+	featurePath, err := w.resolveFeature(featureName)
+	if err != nil {
+		return fail(errOut, err)
+	}
+	editPath := w.specPath()
+	label := "spec"
+	if featurePath != "" {
+		editPath = filepath.Join(w.root, featurePath)
+		label = "feature spec"
 	}
 	lock, locked, err := tryApplyLock(filepath.Join(w.root, ".respex", "operation.lock"))
 	if err != nil {
@@ -78,7 +91,7 @@ func runEdit(args []string, out, errOut io.Writer) int {
 		return fail(errOut, errors.New("another apply, baseline, refine, restore, or edit is already running in this project"))
 	}
 	defer lock.Close()
-	before, err := spec.Read(w.specPath())
+	before, err := spec.Read(editPath)
 	if err != nil {
 		return fail(errOut, err)
 	}
@@ -88,7 +101,7 @@ func runEdit(args []string, out, errOut io.Writer) int {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
-	cmd := exec.CommandContext(ctx, editor[0], append(editor[1:], w.absSpecPath())...)
+	cmd := exec.CommandContext(ctx, editor[0], append(editor[1:], editPath)...)
 	cmd.Dir = w.root
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
@@ -99,16 +112,16 @@ func runEdit(args []string, out, errOut io.Writer) int {
 		}
 		return fail(errOut, fmt.Errorf("editor: %w", err))
 	}
-	after, err := spec.Read(w.specPath())
+	after, err := spec.Read(editPath)
 	if err != nil {
 		return fail(errOut, err)
 	}
 	beforeHash, afterHash := spec.Hash(before), spec.Hash(after)
 	if beforeHash == afterHash {
-		fmt.Fprintln(out, "spec unchanged")
+		fmt.Fprintf(out, "%s unchanged\n", label)
 		return 0
 	}
-	fmt.Fprintf(out, "spec updated (%s… → %s…)\n", beforeHash[:8], afterHash[:8])
+	fmt.Fprintf(out, "%s updated (%s… → %s…)\n", label, beforeHash[:8], afterHash[:8])
 	fmt.Fprintln(out, "review with `respex diff`, then commit or refine")
 	return 0
 }

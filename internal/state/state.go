@@ -31,7 +31,10 @@ type Apply struct {
 	FinishedAt *time.Time
 	ExitCode   *int
 	Outcome    string
-	LogPath    string
+	// FeaturePath is the repository-relative spec file being implemented; empty
+	// for a whole-version apply.
+	FeaturePath string
+	LogPath     string
 }
 
 type Baseline struct {
@@ -51,15 +54,18 @@ type Baseline struct {
 }
 
 type Refine struct {
-	ID               int64
-	Agent            string
-	StartedAt        time.Time
-	FinishedAt       time.Time
-	Outcome          string
-	BeforeHash       string
-	AfterHash        string
-	BeforeContent    []byte
-	AfterContent     []byte
+	ID            int64
+	Agent         string
+	StartedAt     time.Time
+	FinishedAt    time.Time
+	Outcome       string
+	BeforeHash    string
+	AfterHash     string
+	BeforeContent []byte
+	AfterContent  []byte
+	// TargetPath is the repository-relative spec file being refined; empty for
+	// the master spec.
+	TargetPath       string
 	InputFingerprint string
 	LogPath          string
 }
@@ -173,6 +179,17 @@ var migrations = []func(tx *sql.Tx) error{
 	func(tx *sql.Tx) error {
 		_, err := tx.Exec(`ALTER TABLE baselines ADD COLUMN proposal BLOB NOT NULL DEFAULT X''`)
 		return err
+	},
+	func(tx *sql.Tx) error {
+		for _, stmt := range []string{
+			`ALTER TABLE refinements ADD COLUMN target_path TEXT NOT NULL DEFAULT ''`,
+			`ALTER TABLE applies ADD COLUMN feature_path TEXT NOT NULL DEFAULT ''`,
+		} {
+			if _, err := tx.Exec(stmt); err != nil {
+				return err
+			}
+		}
+		return nil
 	},
 }
 
@@ -312,11 +329,12 @@ func (s *DB) ListVersions() ([]SpecVersion, error) {
 }
 
 // InsertApply records the start of an apply run; log_path starts empty and is
-// filled by SetApplyLogPath once the row id has named the file.
-func (s *DB) InsertApply(versionID int64, agent string, now time.Time) (int64, error) {
+// filled by SetApplyLogPath once the row id has named the file. featurePath is
+// empty for a whole-version apply.
+func (s *DB) InsertApply(versionID int64, agent, featurePath string, now time.Time) (int64, error) {
 	res, err := s.db.Exec(`INSERT INTO applies
-		(version_id, agent, started_at, finished_at, exit_code, outcome, log_path)
-		VALUES (?, ?, ?, NULL, NULL, 'running', '')`, versionID, agent, now.UTC().Format(time.RFC3339))
+		(version_id, agent, started_at, finished_at, exit_code, outcome, feature_path, log_path)
+		VALUES (?, ?, ?, NULL, NULL, 'running', ?, '')`, versionID, agent, now.UTC().Format(time.RFC3339), featurePath)
 	if err != nil {
 		return 0, fmt.Errorf("insert apply: %w", err)
 	}
@@ -355,7 +373,7 @@ func scanApply(row scanner) (*Apply, error) {
 	var started string
 	var finished sql.NullString
 	var exit sql.NullInt64
-	if err := row.Scan(&a.ID, &a.VersionID, &a.Agent, &started, &finished, &exit, &a.Outcome, &a.LogPath); err != nil {
+	if err := row.Scan(&a.ID, &a.VersionID, &a.Agent, &started, &finished, &exit, &a.Outcome, &a.FeaturePath, &a.LogPath); err != nil {
 		return nil, err
 	}
 	at, err := parseRFC3339(started)
@@ -377,12 +395,24 @@ func scanApply(row scanner) (*Apply, error) {
 	return &a, nil
 }
 
-// IsApplied reports whether versionID has an apply row with exit_code = 0.
+// IsApplied reports whether versionID has a whole-version apply row with
+// exit_code = 0.
 func (s *DB) IsApplied(versionID int64) (bool, error) {
 	var exists bool
 	if err := s.db.QueryRow(`SELECT EXISTS(
-		SELECT 1 FROM applies WHERE version_id = ? AND exit_code = 0)`, versionID).Scan(&exists); err != nil {
+		SELECT 1 FROM applies WHERE version_id = ? AND exit_code = 0 AND feature_path = '')`, versionID).Scan(&exists); err != nil {
 		return false, fmt.Errorf("is applied: %w", err)
+	}
+	return exists, nil
+}
+
+// IsFeatureApplied reports whether versionID has a successful apply row for
+// the given feature path.
+func (s *DB) IsFeatureApplied(versionID int64, featurePath string) (bool, error) {
+	var exists bool
+	if err := s.db.QueryRow(`SELECT EXISTS(
+		SELECT 1 FROM applies WHERE version_id = ? AND exit_code = 0 AND feature_path = ?)`, versionID, featurePath).Scan(&exists); err != nil {
+		return false, fmt.Errorf("is feature applied: %w", err)
 	}
 	return exists, nil
 }
@@ -407,7 +437,7 @@ func (s *DB) HasUnfinishedApply() (bool, error) {
 
 // ListApplies returns all apply rows, newest first.
 func (s *DB) ListApplies() ([]Apply, error) {
-	rows, err := s.db.Query(`SELECT id, version_id, agent, started_at, finished_at, exit_code, outcome, log_path
+	rows, err := s.db.Query(`SELECT id, version_id, agent, started_at, finished_at, exit_code, outcome, feature_path, log_path
 		FROM applies ORDER BY id DESC`)
 	if err != nil {
 		return nil, fmt.Errorf("list applies: %w", err)
@@ -427,11 +457,11 @@ func (s *DB) ListApplies() ([]Apply, error) {
 	return out, nil
 }
 
-func (s *DB) InsertRefine(agent, outcome, beforeHash, afterHash string, beforeContent, afterContent []byte, inputFingerprint, logPath string, started, finished time.Time) (int64, error) {
+func (s *DB) InsertRefine(agent, outcome, beforeHash, afterHash string, beforeContent, afterContent []byte, targetPath, inputFingerprint, logPath string, started, finished time.Time) (int64, error) {
 	res, err := s.db.Exec(`INSERT INTO refinements
-		(agent, started_at, finished_at, outcome, before_hash, after_hash, before_content, after_content, input_fingerprint, log_path)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, agent, started.UTC().Format(time.RFC3339),
-		finished.UTC().Format(time.RFC3339), outcome, beforeHash, afterHash, beforeContent, afterContent, inputFingerprint, logPath)
+		(agent, started_at, finished_at, outcome, before_hash, after_hash, before_content, after_content, target_path, input_fingerprint, log_path)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, agent, started.UTC().Format(time.RFC3339),
+		finished.UTC().Format(time.RFC3339), outcome, beforeHash, afterHash, beforeContent, afterContent, targetPath, inputFingerprint, logPath)
 	if err != nil {
 		return 0, fmt.Errorf("insert refine: %w", err)
 	}
@@ -439,7 +469,7 @@ func (s *DB) InsertRefine(agent, outcome, beforeHash, afterHash string, beforeCo
 }
 
 func (s *DB) ListRefines() ([]Refine, error) {
-	rows, err := s.db.Query(`SELECT id, agent, started_at, finished_at, outcome, before_hash, after_hash, before_content, after_content, input_fingerprint, log_path
+	rows, err := s.db.Query(`SELECT id, agent, started_at, finished_at, outcome, before_hash, after_hash, before_content, after_content, target_path, input_fingerprint, log_path
 		FROM refinements ORDER BY id DESC`)
 	if err != nil {
 		return nil, fmt.Errorf("list refinements: %w", err)
@@ -449,7 +479,7 @@ func (s *DB) ListRefines() ([]Refine, error) {
 	for rows.Next() {
 		var r Refine
 		var started, finished string
-		if err := rows.Scan(&r.ID, &r.Agent, &started, &finished, &r.Outcome, &r.BeforeHash, &r.AfterHash, &r.BeforeContent, &r.AfterContent, &r.InputFingerprint, &r.LogPath); err != nil {
+		if err := rows.Scan(&r.ID, &r.Agent, &started, &finished, &r.Outcome, &r.BeforeHash, &r.AfterHash, &r.BeforeContent, &r.AfterContent, &r.TargetPath, &r.InputFingerprint, &r.LogPath); err != nil {
 			return nil, fmt.Errorf("list refinements: %w", err)
 		}
 		r.StartedAt, err = parseRFC3339(started)
@@ -487,6 +517,21 @@ func (s *DB) LatestRefine() (*Refine, error) {
 		return nil, err
 	}
 	return &refines[0], nil
+}
+
+// LatestRefineByTarget returns the most recent refinement for a given target
+// path (empty for the master spec).
+func (s *DB) LatestRefineByTarget(targetPath string) (*Refine, error) {
+	refines, err := s.ListRefines()
+	if err != nil || len(refines) == 0 {
+		return nil, err
+	}
+	for i := range refines {
+		if refines[i].TargetPath == targetPath {
+			return &refines[i], nil
+		}
+	}
+	return nil, nil
 }
 
 func (s *DB) InsertBaseline(agent, outcome, beforeHash, afterHash string, beforeContent, afterContent, proposal []byte, logPath string, started, finished time.Time) (int64, error) {

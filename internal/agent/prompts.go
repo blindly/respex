@@ -37,22 +37,45 @@ Fix ambiguity, contradictions, and gaps. Improve structure. Preserve intent.
 Rewrite the spec file in place. Do not modify any other files.
 Finish by summarizing the changes you made.`
 
+	PromptRefineFeature = `Refine the feature specification at {{spec_path}}.
+First read this feature spec, then read the master specification for project-wide
+context, then inspect this repository to ground the critique in what actually exists.
+Fix ambiguity, contradictions, and gaps within this feature. Improve structure.
+Preserve intent. Keep the feature spec focused on this capability and its
+boundaries; do not duplicate content that belongs in the master spec.
+Rewrite only the feature spec file at {{spec_path}}. Do not modify any other files,
+including the master specification.
+Finish by summarizing the changes you made to this feature.`
+
 	PromptApply = `The repository must conform to the design specification at {{spec_path}}.
 Read the spec fully before making changes. If the spec links to other
 specification files alongside it, read them too — they are part of the spec.
 Make the repository match the spec.
 The spec files are immutable: do not modify them.
 Finish with a short summary of the changes you made.`
+
+	PromptApplyFeature = `The repository must implement the feature described in the feature specification at {{spec_path}}.
+First read the master specification at {{master_spec_path}} for project-wide context,
+then read this feature specification thoroughly.
+Make only the changes needed to implement this feature in the repository.
+Do not modify any specification files.
+Finish with a short summary of the changes you made.`
 )
 
 const (
-	PlaceholderPrompt   = "{{prompt}}"
-	PlaceholderSpecPath = "{{spec_path}}"
+	PlaceholderPrompt         = "{{prompt}}"
+	PlaceholderSpecPath       = "{{spec_path}}"
+	PlaceholderMasterSpecPath = "{{master_spec_path}}"
 )
 
 // Expand substitutes placeholders in a prompt template. Replacement values are
 // not rescanned: Expand performs a single pass, so prompt text that itself
-// mentions template syntax is preserved verbatim.
-func Expand(tmpl, prompt, specPath string) string {
-	return strings.NewReplacer(PlaceholderSpecPath, specPath, PlaceholderPrompt, prompt).Replace(tmpl)
+// mentions template syntax is preserved verbatim. The optional masterSpecPath
+// is used when refining or applying an individual feature spec.
+func Expand(tmpl, prompt, specPath string, masterSpecPath ...string) string {
+	repl := []string{PlaceholderSpecPath, specPath, PlaceholderPrompt, prompt}
+	if len(masterSpecPath) > 0 {
+		repl = append(repl, PlaceholderMasterSpecPath, masterSpecPath[0])
+	}
+	return strings.NewReplacer(repl...).Replace(tmpl)
 }

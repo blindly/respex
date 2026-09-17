@@ -22,7 +22,7 @@ func open(t *testing.T) *DB {
 
 func TestFreshOpenCreatesCurrentSchema(t *testing.T) {
 	d := open(t)
-	if v, err := d.SchemaVersion(); err != nil || v != 6 {
+	if v, err := d.SchemaVersion(); err != nil || v != 7 {
 		t.Fatalf("schema version = %d, %v", v, err)
 	}
 }
@@ -128,14 +128,14 @@ func TestMigrateLegacyDatabasePreservesHistory(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer migrated.Close()
-	if version, err := migrated.SchemaVersion(); err != nil || version != 6 {
+	if version, err := migrated.SchemaVersion(); err != nil || version != 7 {
 		t.Fatalf("schema version = %d, %v", version, err)
 	}
 	applies, err := migrated.ListApplies()
 	if err != nil || len(applies) != 1 || applies[0].Outcome != "stale" {
 		t.Fatalf("migrated applies = %+v, %v", applies, err)
 	}
-	if _, err := migrated.InsertRefine("agent", "unchanged", "hash", "hash", []byte("spec"), []byte("spec"), "", "", time.Now(), time.Now()); err != nil {
+	if _, err := migrated.InsertRefine("agent", "unchanged", "hash", "hash", []byte("spec"), []byte("spec"), "", "", "", time.Now(), time.Now()); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -184,8 +184,8 @@ func TestMigrateRollback(t *testing.T) {
 		return errors.New("boom")
 	})
 
-	if _, err := Open(p); err == nil || !strings.Contains(err.Error(), "migrate to v7") {
-		t.Fatalf("Open with failing migration: err = %v, want migrate to v7 error", err)
+	if _, err := Open(p); err == nil || !strings.Contains(err.Error(), "migrate to v8") {
+		t.Fatalf("Open with failing migration: err = %v, want migrate to v8 error", err)
 	}
 
 	migrations = orig
@@ -194,8 +194,8 @@ func TestMigrateRollback(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { d2.Close() })
-	if v, err := d2.SchemaVersion(); err != nil || v != 6 {
-		t.Fatalf("schema version after failed migration = %d, %v; want 6", v, err)
+	if v, err := d2.SchemaVersion(); err != nil || v != 7 {
+		t.Fatalf("schema version after failed migration = %d, %v; want 7", v, err)
 	}
 	var n int
 	if err := d2.db.QueryRow(`SELECT count(*) FROM sqlite_master
@@ -212,7 +212,7 @@ func TestApplyLifecycle(t *testing.T) {
 	now := time.Now()
 	vid, _ := d.InsertVersion("h1", []byte("one"), "", now)
 
-	id, err := d.InsertApply(vid, "fakeagent", now)
+	id, err := d.InsertApply(vid, "fakeagent", "", now)
 	if err != nil || id != 1 {
 		t.Fatalf("InsertApply = %d, %v", id, err)
 	}
@@ -246,7 +246,7 @@ func TestApplyLifecycle(t *testing.T) {
 func TestFailedApplyDoesNotCount(t *testing.T) {
 	d := open(t)
 	vid, _ := d.InsertVersion("h1", []byte("one"), "", time.Now())
-	id, _ := d.InsertApply(vid, "fakeagent", time.Now())
+	id, _ := d.InsertApply(vid, "fakeagent", "", time.Now())
 	d.FinishApply(id, 1, time.Now())
 	if applied, _ := d.IsApplied(vid); applied {
 		t.Fatal("failed apply must not count as applied")
@@ -256,7 +256,7 @@ func TestFailedApplyDoesNotCount(t *testing.T) {
 func TestListAppliesReadsInterruptedRow(t *testing.T) {
 	d := open(t)
 	vid, _ := d.InsertVersion("h1", []byte("one"), "", time.Now())
-	if _, err := d.InsertApply(vid, "fakeagent", time.Now()); err != nil {
+	if _, err := d.InsertApply(vid, "fakeagent", "", time.Now()); err != nil {
 		t.Fatal(err)
 	}
 	a, err := d.ListApplies()

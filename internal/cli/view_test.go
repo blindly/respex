@@ -20,7 +20,7 @@ func TestViewWorkingAndHistory(t *testing.T) {
 	if _, err := st.InsertVersion("hash", []byte("version\n"), "", now); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := st.InsertRefine("agent", "updated", "a", "b", []byte("refine before\n"), []byte("refine after\n"), "fingerprint", "", now, now); err != nil {
+	if _, err := st.InsertRefine("agent", "updated", "a", "b", []byte("refine before\n"), []byte("refine after\n"), "", "fingerprint", "", now, now); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := st.InsertBaseline("agent", "generated", "a", "b", []byte("baseline before\n"), []byte("baseline after\n"), nil, "", now, now); err != nil {

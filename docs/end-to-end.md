@@ -109,6 +109,22 @@ git diff
 
 `respex apply` skips work that is already applied.
 
+## Multi-file projects
+
+When `spec_files` is configured, you can work on one capability at a time:
+
+```text
+respex view auth
+respex edit auth
+respex commit -m "clarify auth requirements"
+respex apply auth
+respex refine auth
+respex check
+```
+
+`commit` always snapshots the whole bundle atomically; `apply auth` and
+`refine auth` use the master spec as context while touching only that feature.
+
 ## Existing project
 
 ### 1. Initialize and baseline

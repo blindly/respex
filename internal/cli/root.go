@@ -43,6 +43,7 @@ var commands = map[string]func(args []string, out, errOut io.Writer) int{
 	"update":     runUpdate,
 	"doctor":     runDoctor,
 	"spec":       runSpec,
+	"check":      runCheck,
 	"completion": runCompletion,
 }
 
@@ -55,13 +56,13 @@ Usage:
 Commands:
   init       initialize Respex in the current repository
   new        compatibility alias for init
-  view       view the working or historical spec
-  edit       open the spec in the configured editor
+  view       view the working or historical spec (optionally by feature)
+  edit       open the spec or a feature spec in the configured editor
   baseline   derive a spec from an existing repository (--split for multi-file)
-  refine     agent critiques and rewrites the spec
+  refine     agent critiques and rewrites the spec or a feature spec
   diff       diff working spec vs last commit (or two versions)
   commit     snapshot the working spec as the approved version
-  apply      agent makes the codebase match the committed spec
+  apply      agent makes the codebase match the committed spec (or one feature)
   log        show versions and applies
   status     summarize spec and state
   restore    restore a saved refinement before-state
@@ -69,6 +70,7 @@ Commands:
   update     securely update the respex binary
   doctor     diagnose configuration and project health
   spec       validate the working specification
+  check      validate the spec bundle for structural and link problems
   completion generate shell completion
 `)
 }

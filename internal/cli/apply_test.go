@@ -175,7 +175,7 @@ func TestApplyWarnsOnUnfinishedRow(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Seed an interrupted-style row: started, never finished.
-	if _, err := st.InsertApply(1, "fakeagent", time.Now()); err != nil {
+	if _, err := st.InsertApply(1, "fakeagent", "", time.Now()); err != nil {
 		t.Fatal(err)
 	}
 	st.Close()

@@ -18,7 +18,7 @@ func TestDoctorProject(t *testing.T) {
 	if code := runDoctor(nil, &out, &errOut); code != 0 {
 		t.Fatalf("doctor = %d, %s | %s", code, out.String(), errOut.String())
 	}
-	for _, want := range []string{"user config", "project config", "state", "schema v6", "spec files", "operation", "version"} {
+	for _, want := range []string{"user config", "project config", "state", "schema v7", "spec files", "operation", "version"} {
 		if !strings.Contains(out.String(), want) {
 			t.Fatalf("doctor missing %q in %s", want, out.String())
 		}

@@ -25,13 +25,33 @@ func runRefine(args []string, out, errOut io.Writer) int {
 	fs := newFlagSet("refine", errOut)
 	noProgress := fs.Bool("no-progress", false, "disable the interactive progress indicator")
 	force := fs.Bool("force", false, "run even when refinement is likely to be a no-op")
-	if err := fs.Parse(args); err != nil {
+
+	// Allow the optional feature name to appear before or after boolean flags.
+	featureName := ""
+	var flagArgs []string
+	for _, a := range args {
+		if strings.HasPrefix(a, "-") {
+			flagArgs = append(flagArgs, a)
+		} else if featureName == "" {
+			featureName = a
+		} else {
+			return fail(errOut, errors.New("usage: respex refine [--force] [--no-progress] [feature]"))
+		}
+	}
+	if err := fs.Parse(flagArgs); err != nil {
 		return fail(errOut, err)
 	}
 	if fs.NArg() != 0 {
-		return fail(errOut, fmt.Errorf("unexpected argument %q — usage: respex refine [--force] [--no-progress]", fs.Arg(0)))
+		return fail(errOut, errors.New("usage: respex refine [--force] [--no-progress] [feature]"))
 	}
 	w, err := discover()
+	if err != nil {
+		return fail(errOut, err)
+	}
+	if featureName != "" && len(w.cfg.SpecFiles) == 0 {
+		return fail(errOut, fmt.Errorf("unexpected argument %q — usage: respex refine [--force] [--no-progress]", featureName))
+	}
+	targetPath, err := w.resolveFeature(featureName)
 	if err != nil {
 		return fail(errOut, err)
 	}
@@ -43,12 +63,17 @@ func runRefine(args []string, out, errOut io.Writer) int {
 		return fail(errOut, errors.New("another apply, baseline, refine, restore, or edit is already running in this project"))
 	}
 	defer lock.Close()
-	before, err := spec.Read(w.specPath())
+
+	livePath := w.specPath()
+	if targetPath != "" {
+		livePath = filepath.Join(w.root, targetPath)
+	}
+	before, err := spec.Read(livePath)
 	if err != nil {
 		return fail(errOut, err)
 	}
 	beforeHash := spec.Hash(before)
-	if !*force && beforeHash == spec.Hash([]byte(spec.Skeleton)) {
+	if targetPath == "" && !*force && beforeHash == spec.Hash([]byte(spec.Skeleton)) {
 		return fail(errOut, errors.New("the spec is still the generated skeleton — run `respex baseline` for an existing repository or `respex edit` first; use `respex refine --force`"))
 	}
 	a, name, err := w.adapter()
@@ -90,16 +115,19 @@ func runRefine(args []string, out, errOut io.Writer) int {
 		if after == nil {
 			after = []byte{}
 		}
-		_, err := st.InsertRefine(name, outcome, beforeHash, afterHash, before, after, inputFingerprint, logRel, started, time.Now())
+		_, err := st.InsertRefine(name, outcome, beforeHash, afterHash, before, after, targetPath, inputFingerprint, logRel, started, time.Now())
 		return err
 	}
 
 	tmpl := agent.PromptRefine
+	if targetPath != "" {
+		tmpl = agent.PromptRefineFeature
+	}
 	if w.cfg.Prompts.Refine != "" {
 		tmpl = w.cfg.Prompts.Refine
 	}
-	inputFingerprint = refineFingerprint(beforeHash, tmpl, a)
-	latestRefine, err := st.LatestRefine()
+	inputFingerprint = refineFingerprint(beforeHash, tmpl+targetPath, a)
+	latestRefine, err := st.LatestRefineByTarget(targetPath)
 	if err != nil {
 		return fail(errOut, err)
 	}
@@ -119,7 +147,11 @@ func runRefine(args []string, out, errOut io.Writer) int {
 	defer stop()
 	ctx, cancel := context.WithTimeout(signalCtx, w.cfg.AgentTimeout)
 	defer cancel()
-	code, err := a.Execute(ctx, agent.Expand(tmpl, "", absSpec), absSpec, f)
+	instr := agent.Expand(tmpl, "", absSpec)
+	if targetPath != "" {
+		instr += fmt.Sprintf("\n\nThe master spec at %s provides project-wide context. Read it, but do not modify it. Rewrite only the feature spec at %s.", w.absSpecPath(), absSpec)
+	}
+	code, err := a.Execute(ctx, instr, absSpec, f)
 	progress.Stop()
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
@@ -146,7 +178,7 @@ func runRefine(args []string, out, errOut io.Writer) int {
 		}
 		return fail(errOut, fmt.Errorf("refine failed (exit %d) — log: %s", code, logPath))
 	}
-	after, err := installSpecCandidate(w.specPath(), candidatePath, before)
+	after, err := installSpecCandidate(livePath, candidatePath, before)
 	if err != nil {
 		candidate, _ := os.ReadFile(candidatePath)
 		if rerr := record("failed", "", candidate); rerr != nil {

@@ -65,4 +65,9 @@ When `spec_files` is configured:
 - `diff` compares the bundle file by file.
 - `status` and `doctor` track every configured file.
 - `apply` hands the agent an immutable copy of the entire committed bundle.
-- `view`, `edit`, `refine`, and `restore` currently operate on the master spec.
+- `apply auth` or `refine auth` targets a single feature spec while using the
+  master spec as context.
+- `view auth` and `edit auth` open an individual feature spec.
+- `respex check` validates the whole bundle for broken links, missing files, and
+  missing required sections.
+- `restore` currently operates on the master spec.
