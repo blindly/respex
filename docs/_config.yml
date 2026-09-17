@@ -11,6 +11,7 @@ color_scheme: light
 aux_links:
   Respex on GitHub:
     - "https://github.com/blindly/respex"
+permalink: pretty
 exclude:
   - superpowers/
   - README.md

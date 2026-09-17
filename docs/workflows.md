@@ -44,7 +44,7 @@ respex baseline accept
 respex commit -m "multi-file baseline"
 ```
 
-See [Multi-file specs](multi-file-specs.md) for details.
+See [Multi-file specs](multi-file-specs/) for details.
 
 ## Refine loop
 

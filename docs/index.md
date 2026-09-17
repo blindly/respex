@@ -52,9 +52,9 @@ respex apply          # → "nothing to do (v1 already applied)"
 
 ## Next steps
 
-- [Getting started](getting-started.md) — initialize, baseline, and iterate.
-- [End-to-end process](end-to-end.md) — the complete lifecycle and when to use each command.
-- [Configuration](configuration.md) — user and project settings.
-- [Commands](commands.md) — full command reference.
-- [Workflows](workflows.md) — `refine`, `baseline`, `apply`, and rollback patterns.
-- [Multi-file specs](multi-file-specs.md) — splitting large specifications into a bundle.
+- [Getting started](getting-started/) — initialize, baseline, and iterate.
+- [End-to-end process](end-to-end/) — the complete lifecycle and when to use each command.
+- [Configuration](configuration/) — user and project settings.
+- [Commands](commands/) — full command reference.
+- [Workflows](workflows/) — `refine`, `baseline`, `apply`, and rollback patterns.
+- [Multi-file specs](multi-file-specs/) — splitting large specifications into a bundle.

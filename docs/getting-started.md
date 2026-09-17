@@ -43,7 +43,7 @@ Use `respex baseline --merge` when `SPEC.md` already contains meaningful
 content.
 
 Use `respex baseline --split` for large codebases that need a multi-file spec
-bundle. See [Multi-file specs](multi-file-specs.md).
+bundle. See [Multi-file specs](multi-file-specs/).
 
 ## Edit and refine
 
