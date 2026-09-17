@@ -4,8 +4,6 @@ title: ReSpex
 nav_order: 1
 ---
 
-# ReSpex
-
 Spec-driven agentic development: one markdown spec per repo, applied by any agent CLI.
 
 `respex` manages the lifecycle of a design spec and dispatches any agentic CLI
