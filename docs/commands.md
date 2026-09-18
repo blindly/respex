@@ -143,7 +143,9 @@ Ask the configured agent to review the spec and repository, then report issues
 without modifying any files. The agent reads the spec, linked feature specs, the
 codebase, tests, and configuration, and outputs a critique with Critical,
 Warnings, and Suggestions sections. Add `--notes` to also pass the project
-scratchpad as context. Output is captured in `.respex/logs/`.
+scratchpad as context. Agent output streams to the terminal by default while
+also being captured in `.respex/logs/`. JSON mode remains silent until it emits
+the final JSON document.
 
 ### `respex check [--json]`
 Validate the configured spec bundle for structural and quality problems: missing

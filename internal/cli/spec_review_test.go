@@ -20,8 +20,8 @@ func TestSpecReview(t *testing.T) {
 	if code := runSpec([]string{"review"}, &out, &errOut); code != 0 {
 		t.Fatalf("spec review = %d, %s | %s", code, out.String(), errOut.String())
 	}
-	if !strings.Contains(out.String(), "review log:") {
-		t.Fatalf("output missing review log: %s", out.String())
+	if !strings.Contains(out.String(), "review log:") || !strings.Contains(out.String(), "Review the design specification") {
+		t.Fatalf("output was not streamed with review log: %s", out.String())
 	}
 	markerBody, _ := os.ReadFile(marker)
 	if !strings.Contains(string(markerBody), "Review the design specification") {

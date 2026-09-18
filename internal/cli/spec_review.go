@@ -11,14 +11,13 @@ import (
 	"time"
 
 	"github.com/blindly/respex/internal/agent"
-	"github.com/blindly/respex/internal/ui"
 )
 
 func runSpecReview(args []string, out, errOut io.Writer) int {
 	fs := newFlagSet("spec review", errOut)
 	withNotes := fs.Bool("notes", false, "also read project notes as context")
 	jsonOut := fs.Bool("json", false, "output results as JSON")
-	noProgress := fs.Bool("no-progress", false, "disable the interactive progress indicator")
+	fs.Bool("no-progress", false, "deprecated; review output is always streamed")
 	if err := fs.Parse(args); err != nil {
 		return fail(errOut, err)
 	}
@@ -72,17 +71,15 @@ func runSpecReview(args []string, out, errOut io.Writer) int {
 		}
 	}
 
-	progressEnabled := ui.IsTTY(os.Stderr) && !*noProgress
-	if !progressEnabled {
-		fmt.Fprintf(out, "reviewing spec; output: %s\n", f.Name())
+	var reviewOut io.Writer = f
+	if !*jsonOut {
+		fmt.Fprintf(out, "review log: %s\n\n", f.Name())
+		reviewOut = io.MultiWriter(out, f)
 	}
-	progress := ui.StartProgress(out, "reviewing spec", progressEnabled)
-	defer progress.Stop()
 
 	ctx, cancel := context.WithTimeout(context.Background(), w.cfg.AgentTimeout)
 	defer cancel()
-	code, err := a.Execute(ctx, instr, specPath, f)
-	progress.Stop()
+	code, err := a.Execute(ctx, instr, specPath, reviewOut)
 	if err != nil {
 		return fail(errOut, err)
 	}
@@ -111,9 +108,6 @@ func runSpecReview(args []string, out, errOut io.Writer) int {
 
 	if len(bytes.TrimSpace(critique)) == 0 {
 		fmt.Fprintln(out, "agent returned no critique")
-		return 0
 	}
-	_, _ = out.Write(critique)
-	fmt.Fprintf(out, "\n\nreview log: %s\n", f.Name())
 	return 0
 }
