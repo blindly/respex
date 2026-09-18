@@ -71,7 +71,7 @@ Commands:
   notes      scratchpad for ideas not yet in the spec
   update     securely update the respex binary
   doctor     diagnose configuration and project health
-  spec       validate the working specification or list open questions
+  spec       validate, list questions, or agent-review the specification
   check      validate the spec bundle for structural and link problems
   completion generate shell completion
 `)

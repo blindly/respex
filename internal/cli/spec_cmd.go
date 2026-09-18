@@ -23,8 +23,10 @@ func runSpec(args []string, out, errOut io.Writer) int {
 		return runSpecValidate(args[1:], out, errOut)
 	case "questions":
 		return runSpecQuestions(args[1:], out, errOut)
+	case "review":
+		return runSpecReview(args[1:], out, errOut)
 	default:
-		return fail(errOut, fmt.Errorf("usage: respex spec <validate|questions>"))
+		return fail(errOut, fmt.Errorf("usage: respex spec <validate|questions|review>"))
 	}
 }
 

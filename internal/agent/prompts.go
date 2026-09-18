@@ -60,6 +60,14 @@ then read this feature specification thoroughly.
 Make only the changes needed to implement this feature in the repository.
 Do not modify any specification files.
 Finish with a short summary of the changes you made.`
+
+	PromptSpecReview = `Review the design specification at {{spec_path}} and the surrounding repository.
+Read the full spec and any linked specification files. Then inspect the codebase, tests, configuration, build files, and existing documentation.
+Output a concise critique with these sections:
+- Critical: issues that block applying the spec (contradictions, missing requirements, implementation risks).
+- Warnings: ambiguous wording, vague requirements, or inconsistencies.
+- Suggestions: improvements that would make the spec easier to implement.
+Do not modify any files. Do not implement anything. Only report findings.`
 )
 
 const (

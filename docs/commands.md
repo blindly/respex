@@ -138,6 +138,13 @@ Non-Goals, Requirements, Open Questions.
 List all open questions from the master spec and any configured feature specs.
 Useful for reviewing what still needs a human decision before applying.
 
+### `respex spec review [--notes] [--json] [feature]`
+Ask the configured agent to review the spec and repository, then report issues
+without modifying any files. The agent reads the spec, linked feature specs, the
+codebase, tests, and configuration, and outputs a critique with Critical,
+Warnings, and Suggestions sections. Add `--notes` to also pass the project
+scratchpad as context. Output is captured in `.respex/logs/`.
+
 ### `respex check [--json]`
 Validate the configured spec bundle for structural and quality problems: missing
 spec files, empty files, missing required sections, broken internal Markdown
