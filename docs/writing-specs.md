@@ -129,7 +129,23 @@ did one of these:
 To protect the content, phrase it as a numbered requirement under `##
 Requirements`, use clear imperatives, and commit before refining.
 
-## JSON and machine-readable output
+## Automatic checks
+
+`respex check` now also flags common spec-quality mistakes:
+
+- `TODO`/`FIXME` markers in the spec.
+- Requirement bullets that read like bug-tracker entries (`fix the broken...`,
+  `currently shows...`, `inconsistent`, `missing`, etc.).
+- Missing required sections and broken internal links.
+
+Run it after editing and before applying:
+
+```text
+respex edit
+respex check
+respex commit -m "specify canonical NAP data"
+respex apply
+```
 
 If you want to enforce that no blocking Open Questions exist before a CI run,
 you can check programmatically:

@@ -125,3 +125,27 @@ func TestCheckBrokenLink(t *testing.T) {
 		t.Fatalf("check output missing broken link failure: %s", out.String())
 	}
 }
+
+func TestCheckBugTrackerLanguage(t *testing.T) {
+	root := setupBundleProject(t)
+	writeSpec(t, root, "# Product\n\n## Intent\n\n## Scope\n\n## Non-Goals\n\n## Requirements\n\n- Fix the broken login button.\n- The terms page currently shows the wrong address.\n\n## Open Questions\n")
+	var out, errOut bytes.Buffer
+	if code := runCheck(nil, &out, &errOut); code != 0 {
+		t.Fatalf("check bug language = %d, %s | %s", code, out.String(), errOut.String())
+	}
+	if !strings.Contains(out.String(), "bug-tracker") {
+		t.Fatalf("check did not warn about bug-tracker language: %s", out.String())
+	}
+}
+
+func TestCheckTodoMarker(t *testing.T) {
+	root := setupBundleProject(t)
+	writeSpec(t, root, "# Product\n\n## Intent\n\n## Scope\n\n## Non-Goals\n\n## Requirements\n\n- TODO: define payment flow.\n\n## Open Questions\n")
+	var out, errOut bytes.Buffer
+	if code := runCheck(nil, &out, &errOut); code != 1 {
+		t.Fatalf("check todo = %d, %s | %s", code, out.String(), errOut.String())
+	}
+	if !strings.Contains(out.String(), "TODO/FIXME") {
+		t.Fatalf("check did not fail on TODO marker: %s", out.String())
+	}
+}

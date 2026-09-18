@@ -126,6 +126,38 @@ func runCheck(args []string, out, errOut io.Writer) int {
 		}
 	}
 
+	// Spec quality checks for every configured spec file.
+	bugTrackerRe := regexp.MustCompile(`(?i)\b(bug|fix|wrong|broken|missing|currently|inconsistent|stale|dead|placeholder)\b`)
+	todoRe := regexp.MustCompile(`(?i)\b(TODO|FIXME|XXX)\b`)
+	for p, b := range contents {
+		reqs := sectionContent(b, "## Requirements")
+		var buggy []string
+		var todos []string
+		for _, line := range strings.Split(string(reqs), "\n") {
+			trimmed := strings.TrimSpace(line)
+			if trimmed == "" {
+				continue
+			}
+			if bugTrackerRe.MatchString(trimmed) {
+				buggy = append(buggy, trimmed)
+			}
+			if todoRe.MatchString(trimmed) {
+				todos = append(todos, trimmed)
+			}
+		}
+		if len(buggy) == 0 {
+			addResult(&results, &summary, "pass", "prescriptive", fmt.Sprintf("%s: requirements are prescriptive", p))
+		} else {
+			msg := fmt.Sprintf("%s: %d requirement(s) look like bug-tracker entries", p, len(buggy))
+			addResult(&results, &summary, "warn", "prescriptive", msg)
+		}
+		if len(todos) == 0 {
+			addResult(&results, &summary, "pass", "todos", fmt.Sprintf("%s: no TODO/FIXME markers", p))
+		} else {
+			addResult(&results, &summary, "fail", "todos", fmt.Sprintf("%s: %d TODO/FIXME marker(s)", p, len(todos)))
+		}
+	}
+
 	// Internal link validity across all spec files.
 	for p, b := range contents {
 		for _, m := range mdLinkRe.FindAllSubmatch(b, -1) {
@@ -182,4 +214,28 @@ func runCheck(args []string, out, errOut io.Writer) int {
 		return 1
 	}
 	return 0
+}
+
+// sectionContent returns the text under the first heading that matches `heading`
+// (case-insensitive). The returned text stops at the next same-level `## ` heading.
+func sectionContent(content []byte, heading string) []byte {
+	want := strings.ToLower(strings.TrimSpace(heading))
+	var lines []string
+	in := false
+	for _, raw := range strings.Split(string(content), "\n") {
+		trimmed := strings.TrimSpace(raw)
+		if strings.HasPrefix(trimmed, "## ") && !strings.HasPrefix(trimmed, "### ") {
+			if in {
+				break
+			}
+			if strings.ToLower(trimmed) == want {
+				in = true
+				continue
+			}
+		}
+		if in {
+			lines = append(lines, raw)
+		}
+	}
+	return []byte(strings.Join(lines, "\n"))
 }

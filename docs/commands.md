@@ -139,9 +139,11 @@ List all open questions from the master spec and any configured feature specs.
 Useful for reviewing what still needs a human decision before applying.
 
 ### `respex check [--json]`
-Validate the configured spec bundle for structural problems: missing spec files,
-empty files, missing required sections, broken internal Markdown links, and
-unlinked feature files. Exits non-zero when any check fails.
+Validate the configured spec bundle for structural and quality problems: missing
+spec files, empty files, missing required sections, broken internal Markdown
+links, unlinked feature files, non-prescriptive requirement language
+(e.g. "fix the broken..."), and `TODO`/`FIXME` markers. Exits non-zero when any
+structural check fails; quality issues are reported as warnings.
 
 ### `respex completion <bash|zsh|fish|powershell>`
 Generate shell completion.
