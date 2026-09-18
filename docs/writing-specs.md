@@ -129,6 +129,67 @@ did one of these:
 To protect the content, phrase it as a numbered requirement under `##
 Requirements`, use clear imperatives, and commit before refining.
 
+## Example spec
+
+Here is a complete, fictional spec for a small product. It shows how each
+section is used, including **Non-Goals**.
+
+```markdown
+# Taskly — command-line task tracker
+
+## 1. Intent
+
+Taskly is a fast, local-first CLI for managing personal tasks. It stores tasks
+in a single Markdown file that a human can read and edit without the tool.
+
+## 2. Scope
+
+- Add, list, complete, and delete tasks from the terminal.
+- Store tasks in `tasks.md` in the current working directory.
+- Support filtering by status and due date.
+
+## 3. Non-Goals
+
+- No cloud sync, accounts, or multi-device support.
+- No recurring tasks or reminders.
+- No graphical user interface.
+- No sub-tasks or project hierarchies.
+
+## 4. Requirements
+
+- `taskly add "buy milk"` appends a new incomplete task to `tasks.md`.
+- `taskly list` prints all incomplete tasks, newest first.
+- `taskly done <id>` marks the task with the matching ID as complete.
+- `taskly remove <id>` removes the task with the matching ID.
+- Task IDs must be stable until the task is removed.
+- `tasks.md` must remain valid Markdown even when edited by hand.
+
+## 5. Open Questions
+
+- Should completed tasks be archived to a separate file or kept in place?
+- What date format should the optional due date use?
+```
+
+### Non-Goals explained
+
+Non-Goals are not just nice-to-have ideas you might add later. They are
+**intentional exclusions** that protect the project from scope creep.
+
+Good Non-Goals:
+
+- "No multi-tenancy."
+- "No mobile app in this release."
+- "No integration with third-party analytics."
+- "No support for Internet Explorer."
+
+Weak Non-Goals:
+
+- "We might add notifications later." (that is a future idea, not an exclusion)
+- "Performance is not a priority." (better as a constraint or note)
+
+If you cannot think of any, force yourself to list at least two. It is a sign
+that you have actually decided what the project is not.
+
 ## Automatic checks
 
 `respex check` now also flags common spec-quality mistakes:
