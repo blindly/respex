@@ -52,6 +52,7 @@ respex apply          # → "nothing to do (v1 already applied)"
 
 - [Getting started](getting-started/) — initialize, baseline, and iterate.
 - [End-to-end process](end-to-end/) — the complete lifecycle and when to use each command.
+- [Writing specs](writing-specs/) — how to write a prescriptive spec instead of a bug tracker.
 - [Open Questions workflow](open-questions/) — resolving decisions before applying.
 - [Configuration](configuration/) — user and project settings.
 - [Commands](commands/) — full command reference.
