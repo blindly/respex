@@ -22,6 +22,11 @@ func TestMissingSections(t *testing.T) {
 	if len(missing) != 4 || missing[0] != "Scope" {
 		t.Fatalf("missing sections = %v", missing)
 	}
+	// Numbered headings should be recognized too.
+	numbered := "## 1. Intent\n## 2. Scope\n## 3. Non-Goals\n## 4. Requirements\n## 5. Open Questions\n"
+	if missing := MissingSections([]byte(numbered)); len(missing) != 0 {
+		t.Fatalf("numbered headings missing sections: %v", missing)
+	}
 }
 
 func TestReadEmptyFails(t *testing.T) {

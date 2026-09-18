@@ -6,8 +6,11 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 )
+
+var headingRe = regexp.MustCompile(`^(#{1,6})\s+(?:\d+[.)]\s+)?(.*)$`)
 
 // Skeleton is the spec file written by `respex init` without a description.
 const Skeleton = `# <Project title>
@@ -51,15 +54,29 @@ func Hash(content []byte) string {
 	return hex.EncodeToString(sum[:])
 }
 
+// HeadingText returns the normalized text of a Markdown heading at the given
+// level, ignoring optional leading numbers such as `## 1. Intent`. It returns an
+// empty string if the line is not a heading of the requested level.
+func HeadingText(line string, level int) string {
+	matches := headingRe.FindStringSubmatch(strings.TrimSpace(line))
+	if len(matches) != 3 || len(matches[1]) != level {
+		return ""
+	}
+	return strings.TrimSpace(matches[2])
+}
+
 func MissingSections(content []byte) []string {
 	required := []string{"Intent", "Scope", "Non-Goals", "Requirements", "Open Questions"}
 	found := make(map[string]bool, len(required))
 	for _, line := range strings.Split(string(content), "\n") {
-		found[strings.TrimSpace(line)] = true
+		text := HeadingText(line, 2)
+		if text != "" {
+			found[text] = true
+		}
 	}
 	var missing []string
 	for _, section := range required {
-		if !found["## "+section] {
+		if !found[section] {
 			missing = append(missing, section)
 		}
 	}

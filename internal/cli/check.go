@@ -130,7 +130,7 @@ func runCheck(args []string, out, errOut io.Writer) int {
 	bugTrackerRe := regexp.MustCompile(`(?i)\b(bug|fix|wrong|broken|missing|currently|inconsistent|stale|dead|placeholder)\b`)
 	todoRe := regexp.MustCompile(`(?i)\b(TODO|FIXME|XXX)\b`)
 	for p, b := range contents {
-		reqs := sectionContent(b, "## Requirements")
+		reqs := sectionContent(b, "Requirements")
 		var buggy []string
 		var todos []string
 		for _, line := range strings.Split(string(reqs), "\n") {
@@ -223,12 +223,12 @@ func sectionContent(content []byte, heading string) []byte {
 	var lines []string
 	in := false
 	for _, raw := range strings.Split(string(content), "\n") {
-		trimmed := strings.TrimSpace(raw)
-		if strings.HasPrefix(trimmed, "## ") && !strings.HasPrefix(trimmed, "### ") {
+		text := spec.HeadingText(raw, 2)
+		if text != "" {
 			if in {
 				break
 			}
-			if strings.ToLower(trimmed) == want {
+			if strings.EqualFold(text, want) {
 				in = true
 				continue
 			}
