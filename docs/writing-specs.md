@@ -16,7 +16,7 @@ the code must follow once the agent is done.
 
 | Instead of | Write |
 |---|---|
-| The `/terms` page shows the wrong address. | The canonical address is **823 Elm Street Suite 208, Fayetteville, NC 28303** and every page, component, and structured-data field must use it. |
+| The `/terms` page shows the wrong address. | The canonical address is **123 Example Lane, Sampletown, ST 12345** and every page, component, and structured-data field must use it. |
 | The NAP data is inconsistent. | All NAP data must be consistent across pages, SEO metadata, and structured data. |
 | The build uses Node 18 locally. | The project targets Node 18 for CI and production builds. |
 
@@ -42,7 +42,7 @@ These three containers look similar but behave differently:
 |---|---|---|
 | `## Notes` (`.respex/notes.md`) | Half-formed ideas you are not ready to decide. | "Maybe add dark mode." |
 | `## Open Questions` | Decisions the project needs but you cannot make yet. | "Which address is authoritative?" |
-| `## Requirements` | Decisions you have made and want the agent to enforce. | "The canonical address is 823 Elm Street." |
+| `## Requirements` | Decisions you have made and want the agent to enforce. | "The canonical address is 123 Example Lane." |
 
 Once you know the answer to an Open Question, move it into Requirements and remove
 it from Open Questions.
@@ -54,8 +54,8 @@ Starting state:
 ```markdown
 ## Open Questions
 
-- Which NAP data is authoritative? The contact page says 823 Elm Street, while
-  `/terms` says 3400 Walsh Parkway.
+- Which NAP data is authoritative? The contact page says 123 Example Lane, while
+  `/terms` says 456 Sample Road.
 ```
 
 After deciding:
@@ -63,7 +63,7 @@ After deciding:
 ```markdown
 ## Requirements
 
-- The canonical address is **823 Elm Street Suite 208, Fayetteville, NC 28303**.
+- The canonical address is **123 Example Lane, Sampletown, ST 12345**.
 - Every page, component, SEO metadata block, and structured-data field must use
   the canonical address.
 - Any page that currently shows a different address must be reconciled.
