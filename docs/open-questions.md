@@ -10,7 +10,7 @@ Open Questions are not defects in the spec. They are **deliberate decision debt*
 things the agent cannot determine from the repository or from a brief.
 Resolving them is a human job.
 
-See [Writing specs](writing-specs/) for how to phrase decisions as requirements
+See [Writing specs](../writing-specs/) for how to phrase decisions as requirements
 once you know the answer.
 
 ## When Open Questions appear
