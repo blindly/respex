@@ -16,7 +16,7 @@ func warnMissingSections(out io.Writer, content []byte) {
 
 func runSpec(args []string, out, errOut io.Writer) int {
 	if len(args) == 0 {
-		return fail(errOut, fmt.Errorf("usage: respex spec <validate|questions>"))
+		return fail(errOut, fmt.Errorf("usage: respex spec <validate|questions|review>"))
 	}
 	switch args[0] {
 	case "validate":
