@@ -8,7 +8,7 @@ For a step-by-step lifecycle guide, see [End-to-end process](https://blindly.git
 `respex` manages the lifecycle of a design spec and dispatches any agentic CLI
 (Claude Code, Gemini CLI, Codex, aider, opencode, amp, …) to act on it:
 
-    init → refine → diff → commit → apply
+    init → refine → diff → commit → apply → verify
 
 The spec is the durable source of truth; the codebase converges to it.
 
@@ -40,6 +40,7 @@ go build .
     respex diff                                     # compare working spec with last commit
     respex commit -m "initial spec"                 # snapshot as approved version
     respex apply                                    # agent makes the repo match the spec
+    respex verify                                   # run the [verify] checks you configured
     respex apply                                    # → "nothing to do (v1 already applied)"
 
 For an existing repository, derive an initial spec from observed code, tests,
@@ -127,6 +128,12 @@ agent_timeout = "1h"                       # hard limit; Go duration syntax
 command = ["claude", "-p", "{{prompt}}"]   # argv array — any agentic CLI
 delivery = "argv"                          # or "stdin" for long prompts
 env = []
+
+[verify]
+commands = [["go", "test", "./..."]]       # optional conformance checks
+timeout = "30m"                            # hard limit for the whole run
+env = []                                   # e.g. ["GOFLAGS=-count=1"]
+audit = false                              # also let the agent audit conformance
 ```
 
 For example, a user-level Devin command can be replaced in one project by
@@ -162,7 +169,10 @@ when ReSpex exits.
 ## State
 
 `.respex/state.db` (SQLite, gitignored) stores spec snapshots, refinement history,
-and apply history. Refinement is repeatable; `respex status` shows the count and
+apply history, and conformance verification results. When `[verify]` is
+configured, a failed verification makes the next `apply` re-run the agent
+instead of reporting "nothing to do". Refinement is repeatable; `respex status`
+shows the count and
 latest result, while `respex log` shows every run. Each refinement saves the spec
 before and after the agent runs. Refining the
 untouched generated skeleton is rejected, as is repeating the same spec, prompt,
@@ -207,7 +217,9 @@ Updates are installed only after the downloaded binary matches the release's
 2. Set `[agent] command` for your CLI
 3. `respex refine` → `respex diff --refine latest` → review the proposal
 4. `respex commit` → `respex apply` → changes appear; review with `git diff`
-5. `respex apply` again → "nothing to do"
+5. `respex verify` → every configured `[verify]` check passes (commands and,
+   when enabled, the agent audit)
+6. `respex apply` again → "nothing to do"
 
 ## License
 

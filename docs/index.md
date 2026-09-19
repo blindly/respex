@@ -10,7 +10,7 @@ Spec-driven agentic development: one markdown spec per repo, applied by any agen
 (Claude Code, Gemini CLI, Codex, aider, opencode, amp, …) to act on it:
 
 ```text
-init → view/edit → refine → diff → commit → apply
+init → view/edit → refine → diff → commit → apply → verify
 ```
 
 The spec is the durable source of truth; the codebase converges to it. ReSpex
@@ -55,6 +55,7 @@ respex apply          # → "nothing to do (v1 already applied)"
 - [Writing specs](writing-specs/) — how to write a prescriptive spec instead of a bug tracker.
 - [Open Questions workflow](open-questions/) — resolving decisions before applying.
 - [Configuration](configuration/) — user and project settings.
+- [Verification](verification/) — opt-in conformance checks that keep applies honest.
 - [Commands](commands/) — full command reference.
 - [Workflows](workflows/) — `refine`, `baseline`, `apply`, and rollback patterns.
 - [Multi-file specs](multi-file-specs/) — splitting large specifications into a bundle.

@@ -74,6 +74,18 @@ respex apply
 `apply` refuses to run if the working spec differs from the last committed
 version; commit first.
 
+## Verification loop
+
+```text
+respex verify              # run the configured [verify] checks
+respex apply               # re-runs the agent while verification fails
+```
+
+With `[verify]` configured, `apply` chains the checks after the agent and
+treats a failed verification as drift: the next apply re-runs the agent rather
+than reporting "nothing to do". Fix the code (or the checks) and the next
+apply passes. See [Verification](verification/).
+
 ## Rollback
 
 ```text

@@ -61,7 +61,33 @@ env = []
 # baseline = "..."
 # refine   = "..."
 # apply    = "..."
+# verify   = "..."
+
+[verify]
+# Optional conformance checks run by respex verify and chained after each
+# whole-version apply. Commands run in order against the working tree and
+# stop at the first failure; an empty list keeps verification off.
+# commands = [["go", "build", "./..."], ["go", "test", "./..."]]
+# timeout = "30m"                             # hard limit for the whole run
+# env = []                                    # extra environment, e.g. ["GOFLAGS=-count=1"]
+# audit = false                               # also let the configured agent audit conformance
 ```
+
+## Verification
+
+`[verify]` configures conformance checks run by `respex verify` and chained
+after every whole-version `respex apply`. Commands run in order against the
+working tree with the project root as working directory; the run stops at the
+first failing command and the rest are recorded as skipped. Exit code is 0
+only when every check passed. Verification is opt-in: an empty or absent
+`commands` list with `audit` disabled keeps it off. When it is configured,
+`apply` counts a version as "already applied" only while its latest
+verification passed — see [Verification](verification/).
+
+With `audit = true`, the configured agent additionally audits conformance
+against the committed spec after the command checks pass; its
+`CONFORMS: yes/no` reply counts as a check. Override the audit prompt with
+`[prompts] verify`.
 
 ## Editor and pager
 

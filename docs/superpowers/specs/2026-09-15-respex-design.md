@@ -23,7 +23,9 @@ commits code.
 2. Agent-agnostic integration through a command-template adapter defined as
    configuration data; "any agentic tool" is structural, not a curated list.
 3. Deterministic no-op behavior: `apply` runs the agent only when an
-   unapplied committed spec version exists.
+   unapplied committed spec version exists. When the opt-in `[verify]` block
+   is configured, a version also counts as applied only while its latest
+   verification passed.
 4. Local, file-only state (SQLite); works in non-git repositories.
 5. Cross-platform static binaries (linux/darwin/windows × amd64/arm64).
 
@@ -34,8 +36,12 @@ commits code.
 - No dashboard, server, or daemon.
 - No built-in agent presets at v1 (the template contract suffices; presets are
   config snippets to be added incrementally).
-- No post-apply verification (build/test runs) and no git commits of code —
-  the user reviews and commits agent output themselves.
+- No git commits of code — the user reviews and commits agent output
+  themselves. (Post-apply conformance verification later became an opt-in
+  `respex verify` command composed into `apply` via the `[verify]` config
+  block and a `verifications` table in the state database, with an optional
+  agent audit (`[verify] audit`) reusing the same prompt-template adapter;
+  feature-level verification remains out of scope.)
 - No remote sync of the state database.
 
 ## 3. Lifecycle and Commands
@@ -46,6 +52,8 @@ respex refine              agent critiques and rewrites the spec in place
 respex diff [vA vB]        unified diff of spec versions
 respex commit [-m msg]     snapshot the working spec as the approved version
 respex apply [--agent tpl] agent makes the codebase match the committed spec
+respex verify              run configured conformance checks (commands and
+                           optional agent audit) against the tree
 respex log                 list spec versions, commits, and applies
 respex status              summarize spec and state
 respex --version | --help

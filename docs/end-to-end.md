@@ -34,6 +34,11 @@ toward it.
                │
                ▼
         ┌─────────────┐
+        │   verify    │  ← optional conformance checks ([verify] config)
+        └──────┬──────┘
+               │
+               ▼
+        ┌─────────────┐
         │  code + git │
         │   commit    │
         └─────────────┘
@@ -96,6 +101,20 @@ Apply gives the agent an immutable copy of the committed spec. The agent edits
 the repository, not the spec. Review the code changes with `git diff`, then
 commit them in git.
 
+### 4b. Verify conformance
+
+When `[verify]` checks are configured (commands or the agent audit), apply
+runs them automatically after the agent finishes; you can also run them any
+time:
+
+```text
+respex verify
+```
+
+A failed verification makes the next `apply` re-run the agent instead of
+reporting "nothing to do", so the loop keeps pulling the codebase toward the
+spec. See [Verification](verification/).
+
 ### 5. Iterate
 
 When requirements change, update the spec and repeat:
@@ -107,7 +126,8 @@ respex apply
 git diff
 ```
 
-`respex apply` skips work that is already applied.
+`respex apply` skips work that is already applied. When verification is
+configured, only a passed verification counts as applied.
 
 ## Open Questions
 
@@ -207,7 +227,8 @@ Restore is itself reversible, so experimenting is safe.
 
 ```text
 respex status          # spec state, dirty flag, operation lock, agent
-respex log             # versions, baselines, refinements, applies
+respex log             # versions, baselines, refinements, applies, verifications
+respex verify          # run conformance checks against the working tree
 respex spec validate   # required sections check
 respex doctor          # config, tools, state, lock health
 ```

@@ -67,3 +67,8 @@ Apply gives the agent an immutable copy of the committed spec, then runs the
 agent against the repository. Output is captured in `.respex/logs/`.
 
 Run `respex apply` again and ReSpex reports that the version is already applied.
+
+With `[verify]` checks configured in `.respex/config.toml` (commands, or
+`audit = true` for an agent audit), `respex verify` runs conformance checks
+against the working tree and every whole-version `apply` chains them after the
+agent finishes. See [Verification](verification/).

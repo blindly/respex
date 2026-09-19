@@ -60,14 +60,38 @@ Apply the committed spec to the repository. Pass a feature name to implement
 only that feature from the committed bundle. Always uses an immutable snapshot of
 the committed version, so external edits cannot affect the run.
 
+When verification is configured (`[verify]` commands or `audit`), a
+whole-version apply chains a verification run after the agent finishes; the
+command exits non-zero if the checks fail while the apply row itself still
+records success.
+
+### `respex verify [--json]`
+Run the configured conformance checks against the working tree. Each
+`[verify]` command runs in order with the project root as its working
+directory; the run stops at the first failing command and the remaining
+commands are reported as skipped. With `audit = true`, the configured agent
+additionally audits conformance against the committed spec and its
+`CONFORMS: yes/no` reply counts as a check (see
+[Verification](verification/)). The result is recorded in
+`.respex/state.db` and the combined output is logged to
+`.respex/logs/<id>-verify.log`. The exit code is 0 only when every check
+passed. Verify refuses to run while the working spec differs from the last
+committed version.
+
+```text
+respex verify
+respex verify --json
+```
+
 ## History and recovery
 
 ### `respex log [--json]`
-Show versions, applies, baselines, and refinements.
+Show versions, applies, baselines, refinements, and verifications.
 
 ### `respex status [--json]`
-Summarize the spec, dirty state, apply state, refinement/baseline history, and
-agent configuration. Also reports pending split baseline proposals.
+Summarize the spec, dirty state, apply state, latest verification result,
+refinement/baseline history, and agent configuration. Also reports pending
+split baseline proposals.
 
 ### `respex restore <--refine|--baseline> <id|latest> --before`
 Restore the working spec to the before-state of a refinement or baseline.
@@ -128,7 +152,9 @@ replacing the binary.
 Diagnose configuration, project, tools, state, operation lock, and version.
 The `agent` check validates that the configured agent binary exists and that
 its command template uses supported placeholders correctly. Add `--agent-check`
-to also run a short test prompt through the agent and verify it responds.
+to also run a short test prompt through the agent and verify it responds. When
+`[verify]` checks are configured, the `verify` check resolves each command's
+binary; with `audit = true` it also validates the configured agent binary.
 
 ### `respex spec validate`
 Check that the working spec has the required sections: Intent, Scope,
