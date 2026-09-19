@@ -70,6 +70,23 @@ type Refine struct {
 	LogPath          string
 }
 
+// Verification is one conformance check of the working tree against a
+// committed spec version: the configured [verify] commands, run against the
+// working tree as-is. FinishedAt is nil while the run is active; Detail is
+// JSON describing the per-command results.
+type Verification struct {
+	ID         int64
+	VersionID  int64
+	Agent      string
+	StartedAt  time.Time
+	FinishedAt *time.Time
+	Outcome    string
+	GitSHA     string
+	TreeDirty  bool
+	Detail     string
+	LogPath    string
+}
+
 // DB wraps the SQLite handle and owns migrations.
 type DB struct {
 	db *sql.DB
@@ -184,6 +201,28 @@ var migrations = []func(tx *sql.Tx) error{
 		for _, stmt := range []string{
 			`ALTER TABLE refinements ADD COLUMN target_path TEXT NOT NULL DEFAULT ''`,
 			`ALTER TABLE applies ADD COLUMN feature_path TEXT NOT NULL DEFAULT ''`,
+		} {
+			if _, err := tx.Exec(stmt); err != nil {
+				return err
+			}
+		}
+		return nil
+	},
+	func(tx *sql.Tx) error {
+		for _, stmt := range []string{
+			`CREATE TABLE verifications (
+				id          INTEGER PRIMARY KEY AUTOINCREMENT,
+				version_id  INTEGER NOT NULL REFERENCES spec_versions(id),
+				agent       TEXT NOT NULL,
+				started_at  TEXT NOT NULL,
+				finished_at TEXT,
+				outcome     TEXT NOT NULL DEFAULT 'running',
+				git_sha     TEXT NOT NULL DEFAULT '',
+				tree_dirty  INTEGER NOT NULL DEFAULT 0,
+				detail      TEXT NOT NULL DEFAULT '',
+				log_path    TEXT NOT NULL DEFAULT ''
+			)`,
+			`CREATE INDEX idx_verifications_version ON verifications(version_id)`,
 		} {
 			if _, err := tx.Exec(stmt); err != nil {
 				return err
@@ -455,6 +494,157 @@ func (s *DB) ListApplies() ([]Apply, error) {
 		return nil, fmt.Errorf("list applies: %w", rErr)
 	}
 	return out, nil
+}
+
+// InsertVerification records the start of a verification run. agent is empty
+// for the built-in [verify] commands and names an auditing agent in later
+// phases.
+func (s *DB) InsertVerification(versionID int64, agent string, now time.Time) (int64, error) {
+	res, err := s.db.Exec(`INSERT INTO verifications
+		(version_id, agent, started_at, finished_at, outcome, git_sha, tree_dirty, detail, log_path)
+		VALUES (?, ?, ?, NULL, 'running', '', 0, '', '')`, versionID, agent, now.UTC().Format(time.RFC3339))
+	if err != nil {
+		return 0, fmt.Errorf("insert verification: %w", err)
+	}
+	return res.LastInsertId()
+}
+
+// SetVerificationLogPath records the (repo-relative) log path for a
+// verification row.
+func (s *DB) SetVerificationLogPath(id int64, logPath string) error {
+	_, err := s.db.Exec(`UPDATE verifications SET log_path = ? WHERE id = ?`, logPath, id)
+	if err != nil {
+		return fmt.Errorf("set verification log path: %w", err)
+	}
+	return nil
+}
+
+// FinishVerificationWithOutcome stamps the outcome (passed, failed, error,
+// timed_out, interrupted, stale) and the per-command detail JSON.
+func (s *DB) FinishVerificationWithOutcome(id int64, outcome string, detail []byte, now time.Time) error {
+	_, err := s.db.Exec(`UPDATE verifications SET finished_at = ?, outcome = ?, detail = ? WHERE id = ?`,
+		now.UTC().Format(time.RFC3339), outcome, string(detail), id)
+	if err != nil {
+		return fmt.Errorf("finish verification: %w", err)
+	}
+	return nil
+}
+
+// FinishVerification stamps a passed/failed outcome derived from the exit
+// code, mirroring FinishApply.
+func (s *DB) FinishVerification(id int64, exitCode int, detail []byte, now time.Time) error {
+	outcome := "failed"
+	if exitCode == 0 {
+		outcome = "passed"
+	}
+	return s.FinishVerificationWithOutcome(id, outcome, detail, now)
+}
+
+func scanVerification(row scanner) (*Verification, error) {
+	var v Verification
+	var started string
+	var finished sql.NullString
+	var dirty int
+	if err := row.Scan(&v.ID, &v.VersionID, &v.Agent, &started, &finished, &v.Outcome, &v.GitSHA, &dirty, &v.Detail, &v.LogPath); err != nil {
+		return nil, err
+	}
+	at, err := parseRFC3339(started)
+	if err != nil {
+		return nil, fmt.Errorf("verifications.started_at: %w", err)
+	}
+	v.StartedAt = at
+	if finished.Valid {
+		ft, err := parseRFC3339(finished.String)
+		if err != nil {
+			return nil, fmt.Errorf("verifications.finished_at: %w", err)
+		}
+		v.FinishedAt = &ft
+	}
+	v.TreeDirty = dirty != 0
+	return &v, nil
+}
+
+// LatestVerification returns the newest verification row for versionID, or
+// nil when none exist.
+func (s *DB) LatestVerification(versionID int64) (*Verification, error) {
+	row := s.db.QueryRow(`SELECT id, version_id, agent, started_at, finished_at, outcome, git_sha, tree_dirty, detail, log_path
+		FROM verifications WHERE version_id = ? ORDER BY id DESC LIMIT 1`, versionID)
+	v, err := scanVerification(row)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("latest verification: %w", err)
+	}
+	return v, nil
+}
+
+// ListVerifications returns all verification rows, newest first.
+func (s *DB) ListVerifications() ([]Verification, error) {
+	rows, err := s.db.Query(`SELECT id, version_id, agent, started_at, finished_at, outcome, git_sha, tree_dirty, detail, log_path
+		FROM verifications ORDER BY id DESC`)
+	if err != nil {
+		return nil, fmt.Errorf("list verifications: %w", err)
+	}
+	defer rows.Close()
+	var out []Verification
+	for rows.Next() {
+		v, err := scanVerification(rows)
+		if err != nil {
+			return nil, fmt.Errorf("list verifications: scan verification: %w", err)
+		}
+		out = append(out, *v)
+	}
+	if rErr := rows.Err(); rErr != nil {
+		return nil, fmt.Errorf("list verifications: %w", rErr)
+	}
+	return out, nil
+}
+
+// MarkUnfinishedVerificationsStale marks verification rows that never
+// finished (e.g. respex was killed mid-run) as stale.
+func (s *DB) MarkUnfinishedVerificationsStale() error {
+	_, err := s.db.Exec(`UPDATE verifications SET outcome = 'stale' WHERE finished_at IS NULL`)
+	if err != nil {
+		return fmt.Errorf("mark stale verifications: %w", err)
+	}
+	return nil
+}
+
+// Conformed reports whether versionID counts as applied: it has a successful
+// whole-version apply row and — when requireVerified is set — its latest
+// verification passed. The second return value explains a negative result:
+// "no successful apply", "never verified", "verification failed", or
+// "verification <outcome>".
+func (s *DB) Conformed(versionID int64, requireVerified bool) (bool, string, error) {
+	applied, err := s.IsApplied(versionID)
+	if err != nil {
+		return false, "", err
+	}
+	if !applied {
+		return false, "no successful apply", nil
+	}
+	if !requireVerified {
+		return true, "", nil
+	}
+	v, err := s.LatestVerification(versionID)
+	if err != nil {
+		return false, "", err
+	}
+	if v == nil {
+		return false, "never verified", nil
+	}
+	switch v.Outcome {
+	case "passed":
+		return true, "", nil
+	case "failed":
+		return false, "verification failed", nil
+	default:
+		if v.FinishedAt == nil {
+			return false, "verification did not finish", nil
+		}
+		return false, "verification " + v.Outcome, nil
+	}
 }
 
 func (s *DB) InsertRefine(agent, outcome, beforeHash, afterHash string, beforeContent, afterContent []byte, targetPath, inputFingerprint, logPath string, started, finished time.Time) (int64, error) {

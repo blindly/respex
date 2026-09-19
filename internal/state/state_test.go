@@ -3,6 +3,7 @@ package state
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,7 +23,7 @@ func open(t *testing.T) *DB {
 
 func TestFreshOpenCreatesCurrentSchema(t *testing.T) {
 	d := open(t)
-	if v, err := d.SchemaVersion(); err != nil || v != 7 {
+	if v, err := d.SchemaVersion(); err != nil || v != len(migrations) {
 		t.Fatalf("schema version = %d, %v", v, err)
 	}
 }
@@ -128,7 +129,7 @@ func TestMigrateLegacyDatabasePreservesHistory(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer migrated.Close()
-	if version, err := migrated.SchemaVersion(); err != nil || version != 7 {
+	if version, err := migrated.SchemaVersion(); err != nil || version != len(migrations) {
 		t.Fatalf("schema version = %d, %v", version, err)
 	}
 	applies, err := migrated.ListApplies()
@@ -184,8 +185,8 @@ func TestMigrateRollback(t *testing.T) {
 		return errors.New("boom")
 	})
 
-	if _, err := Open(p); err == nil || !strings.Contains(err.Error(), "migrate to v8") {
-		t.Fatalf("Open with failing migration: err = %v, want migrate to v8 error", err)
+	if _, err := Open(p); err == nil || !strings.Contains(err.Error(), fmt.Sprintf("migrate to v%d", len(orig)+1)) {
+		t.Fatalf("Open with failing migration: err = %v, want migrate-to-v%d error", err, len(orig)+1)
 	}
 
 	migrations = orig
@@ -194,8 +195,8 @@ func TestMigrateRollback(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { d2.Close() })
-	if v, err := d2.SchemaVersion(); err != nil || v != 7 {
-		t.Fatalf("schema version after failed migration = %d, %v; want 7", v, err)
+	if v, err := d2.SchemaVersion(); err != nil || v != len(orig) {
+		t.Fatalf("schema version after failed migration = %d, %v; want %d", v, err, len(orig))
 	}
 	var n int
 	if err := d2.db.QueryRow(`SELECT count(*) FROM sqlite_master
@@ -268,5 +269,124 @@ func TestListAppliesReadsInterruptedRow(t *testing.T) {
 	}
 	if a[0].FinishedAt != nil || a[0].ExitCode != nil || a[0].LogPath != "" {
 		t.Fatalf("interrupted row = %+v; want nil FinishedAt, nil ExitCode, empty LogPath", a[0])
+	}
+}
+
+func TestVerificationLifecycle(t *testing.T) {
+	d := open(t)
+	now := time.Now()
+	vid, _ := d.InsertVersion("h1", []byte("one"), "", now)
+
+	id, err := d.InsertVerification(vid, "", now)
+	if err != nil || id != 1 {
+		t.Fatalf("InsertVerification = %d, %v", id, err)
+	}
+	v, err := d.LatestVerification(vid)
+	if err != nil || v == nil || v.Outcome != "running" || v.FinishedAt != nil || v.LogPath != "" {
+		t.Fatalf("LatestVerification while running = %+v, %v", v, err)
+	}
+	if err := d.SetVerificationLogPath(id, ".respex/logs/1-verify.log"); err != nil {
+		t.Fatal(err)
+	}
+	detail := []byte(`{"commands":[{"command":["go","test"],"status":"passed","exit":0}]}`)
+	if err := d.FinishVerification(id, 0, detail, now.Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	v, err = d.LatestVerification(vid)
+	if err != nil || v == nil || v.Outcome != "passed" || v.FinishedAt == nil ||
+		v.LogPath != ".respex/logs/1-verify.log" || v.Detail != string(detail) {
+		t.Fatalf("LatestVerification after finish = %+v, %v", v, err)
+	}
+	// A second (failing) run becomes the latest row.
+	id2, err := d.InsertVerification(vid, "", now.Add(time.Minute))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := d.FinishVerification(id2, 1, nil, now.Add(time.Minute+time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	all, err := d.ListVerifications()
+	if err != nil || len(all) != 2 || all[0].ID != id2 || all[0].Outcome != "failed" || all[1].ID != id {
+		t.Fatalf("ListVerifications = %+v, %v", all, err)
+	}
+}
+
+func TestLatestVerificationNilWhenEmpty(t *testing.T) {
+	d := open(t)
+	vid, _ := d.InsertVersion("h1", []byte("one"), "", time.Now())
+	v, err := d.LatestVerification(vid)
+	if err != nil || v != nil {
+		t.Fatalf("LatestVerification = %+v, %v; want nil, nil", v, err)
+	}
+}
+
+func TestMarkUnfinishedVerificationsStale(t *testing.T) {
+	d := open(t)
+	now := time.Now()
+	vid, _ := d.InsertVersion("h1", []byte("one"), "", now)
+	crashed, _ := d.InsertVerification(vid, "", now)
+	finished, _ := d.InsertVerification(vid, "", now)
+	if err := d.FinishVerification(finished, 0, nil, now); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.MarkUnfinishedVerificationsStale(); err != nil {
+		t.Fatal(err)
+	}
+	all, err := d.ListVerifications()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(all) != 2 || all[0].Outcome != "passed" || all[1].Outcome != "stale" || all[1].ID != crashed {
+		t.Fatalf("after stale mark = %+v", all)
+	}
+}
+
+func TestConformed(t *testing.T) {
+	d := open(t)
+	now := time.Now()
+	vid, _ := d.InsertVersion("h1", []byte("one"), "", now)
+
+	if ok, reason, err := d.Conformed(vid, false); ok || reason != "no successful apply" || err != nil {
+		t.Fatalf("Conformed before apply = %v, %q, %v", ok, reason, err)
+	}
+
+	// Applied but never verified: conformed without the requirement, not with it.
+	id, _ := d.InsertApply(vid, "fakeagent", "", now)
+	d.FinishApply(id, 0, now.Add(time.Second))
+	if ok, _, err := d.Conformed(vid, false); !ok || err != nil {
+		t.Fatalf("Conformed(require=false) = %v, %v; want true", ok, err)
+	}
+	if ok, reason, err := d.Conformed(vid, true); ok || reason != "never verified" || err != nil {
+		t.Fatalf("Conformed(require=true) = %v, %q, %v; want never verified", ok, reason, err)
+	}
+
+	// A failed verification keeps the version unconformed.
+	failedID, _ := d.InsertVerification(vid, "", now.Add(time.Minute))
+	d.FinishVerification(failedID, 1, nil, now.Add(time.Minute+time.Second))
+	if ok, reason, err := d.Conformed(vid, true); ok || reason != "verification failed" || err != nil {
+		t.Fatalf("Conformed after failed verify = %v, %q, %v", ok, reason, err)
+	}
+
+	// A later passed verification restores conformance.
+	passedID, _ := d.InsertVerification(vid, "", now.Add(2*time.Minute))
+	d.FinishVerification(passedID, 0, nil, now.Add(2*time.Minute+time.Second))
+	if ok, _, err := d.Conformed(vid, true); !ok || err != nil {
+		t.Fatalf("Conformed after passed verify = %v, %v; want true", ok, err)
+	}
+
+	// An unfinished verification also blocks.
+	if _, err := d.InsertVerification(vid, "", now.Add(3*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if ok, reason, err := d.Conformed(vid, true); ok || reason != "verification did not finish" || err != nil {
+		t.Fatalf("Conformed with running verify = %v, %q, %v", ok, reason, err)
+	}
+
+	// A failed apply does not count, with or without the requirement.
+	vid2, _ := d.InsertVersion("h2", []byte("two"), "", now)
+	badID, _ := d.InsertApply(vid2, "fakeagent", "", now)
+	d.FinishApply(badID, 1, now.Add(time.Second))
+	if ok, reason, err := d.Conformed(vid2, true); ok || reason != "no successful apply" || err != nil {
+		t.Fatalf("Conformed with failed apply = %v, %q, %v", ok, reason, err)
 	}
 }
