@@ -63,6 +63,7 @@ func TestPromptsMergeKeyByKey(t *testing.T) {
 	write(t, g, `[prompts]
 refine = "global-refine"
 apply = "global-apply"
+verify = "global-verify"
 `)
 	write(t, p, `[prompts]
 apply = "project-apply"
@@ -73,6 +74,9 @@ apply = "project-apply"
 	}
 	if cfg.Prompts.Refine != "global-refine" || cfg.Prompts.Apply != "project-apply" || cfg.Prompts.Draft != "" {
 		t.Fatalf("prompts merge wrong: %+v", cfg.Prompts)
+	}
+	if cfg.Prompts.Verify != "global-verify" {
+		t.Fatalf("prompts verify merge wrong: %q", cfg.Prompts.Verify)
 	}
 }
 
@@ -138,5 +142,56 @@ func TestGlobalPath(t *testing.T) {
 	}
 	if want := filepath.Join(dir, "respex", "config.toml"); got != want {
 		t.Fatalf("GlobalPath() = %q, want %q", got, want)
+	}
+}
+
+func TestVerifyMerge(t *testing.T) {
+	dir := t.TempDir()
+	g := filepath.Join(dir, "global.toml")
+	p := filepath.Join(dir, "project.toml")
+	write(t, g, `[verify]
+commands = [["go", "test", "./..."]]
+timeout = "1h"
+audit = true
+`)
+	write(t, p, `[verify]
+commands = [["go", "build", "./..."]]
+env = ["GOFLAGS=-count=1"]
+`)
+	cfg, err := Load(g, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// commands and env come from project; timeout survives from global.
+	if len(cfg.Verify.Commands) != 1 || cfg.Verify.Commands[0][0] != "go" || cfg.Verify.Commands[0][1] != "build" {
+		t.Fatalf("verify commands merge wrong: %+v", cfg.Verify.Commands)
+	}
+	if cfg.Verify.Timeout != time.Hour {
+		t.Fatalf("verify timeout = %s; want 1h from global", cfg.Verify.Timeout)
+	}
+	if len(cfg.Verify.Env) != 1 || cfg.Verify.Env[0] != "GOFLAGS=-count=1" {
+		t.Fatalf("verify env merge wrong: %+v", cfg.Verify.Env)
+	}
+	// audit = true survives from global when project does not set it.
+	if !cfg.Verify.Audit {
+		t.Fatal("verify audit merge wrong: want true from global")
+	}
+}
+
+func TestVerifyDefaultsAndInvalidTimeout(t *testing.T) {
+	dir := t.TempDir()
+	cfg, err := Load(filepath.Join(dir, "nope.toml"), filepath.Join(dir, "nope2.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Verify.Timeout != 30*time.Minute || len(cfg.Verify.Commands) != 0 {
+		t.Fatalf("verify defaults wrong: %+v", cfg.Verify)
+	}
+	p := filepath.Join(dir, "bad.toml")
+	write(t, p, `[verify]
+timeout = "never"
+`)
+	if _, err := Load("", p); err == nil || !strings.Contains(err.Error(), "invalid verify timeout") {
+		t.Fatalf("want invalid verify timeout error, got %v", err)
 	}
 }

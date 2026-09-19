@@ -113,7 +113,10 @@ func runConfigShow(out, errOut io.Writer, jsonOutput bool) int {
 			"editor": value(cfg.Editor, "", "editor"), "pager": value(cfg.Pager, "", "pager"),
 			"agent_timeout": value(cfg.AgentTimeout.String(), "", "agent_timeout"),
 			"agent_command": value(cfg.Agent.Command, "agent", "command"), "agent_delivery": value(cfg.Agent.Delivery, "agent", "delivery"),
-			"agent_env": value(redactEnv(cfg.Agent.Env), "agent", "env"),
+			"agent_env":       value(redactEnv(cfg.Agent.Env), "agent", "env"),
+			"verify_commands": value(cfg.Verify.Commands, "verify", "commands"), "verify_timeout": value(cfg.Verify.Timeout.String(), "verify", "timeout"),
+			"verify_env":   value(redactEnv(cfg.Verify.Env), "verify", "env"),
+			"verify_audit": value(cfg.Verify.Audit, "verify", "audit"),
 		}
 		if err := json.NewEncoder(out).Encode(payload); err != nil {
 			return fail(errOut, err)
@@ -133,5 +136,17 @@ func runConfigShow(out, errOut io.Writer, jsonOutput bool) int {
 	fmt.Fprintf(out, "agent.command: %s  (%s)\n", formatArgv(cfg.Agent.Command), configSource(userKeys, projectKeys, "agent", "command"))
 	fmt.Fprintf(out, "agent.delivery: %s  (%s)\n", cfg.Agent.Delivery, configSource(userKeys, projectKeys, "agent", "delivery"))
 	fmt.Fprintf(out, "agent.env:     %s  (%s)\n", redactEnv(cfg.Agent.Env), configSource(userKeys, projectKeys, "agent", "env"))
+	verifyCmds := "(none)"
+	if len(cfg.Verify.Commands) > 0 {
+		parts := make([]string, len(cfg.Verify.Commands))
+		for i, argv := range cfg.Verify.Commands {
+			parts[i] = formatArgv(argv)
+		}
+		verifyCmds = strings.Join(parts, " then ")
+	}
+	fmt.Fprintf(out, "verify.commands: %s  (%s)\n", verifyCmds, configSource(userKeys, projectKeys, "verify", "commands"))
+	fmt.Fprintf(out, "verify.timeout:  %s  (%s)\n", cfg.Verify.Timeout, configSource(userKeys, projectKeys, "verify", "timeout"))
+	fmt.Fprintf(out, "verify.env:      %s  (%s)\n", redactEnv(cfg.Verify.Env), configSource(userKeys, projectKeys, "verify", "env"))
+	fmt.Fprintf(out, "verify.audit:    %t  (%s)\n", cfg.Verify.Audit, configSource(userKeys, projectKeys, "verify", "audit"))
 	return 0
 }

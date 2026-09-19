@@ -45,8 +45,12 @@ func runLog(args []string, out, errOut io.Writer) int {
 	if err != nil {
 		return fail(errOut, err)
 	}
+	verifications, err := st.ListVerifications()
+	if err != nil {
+		return fail(errOut, err)
+	}
 	if jsonOutput {
-		if err := json.NewEncoder(out).Encode(map[string]any{"versions": versions, "applies": applies, "baselines": baselines, "refinements": refines}); err != nil {
+		if err := json.NewEncoder(out).Encode(map[string]any{"versions": versions, "applies": applies, "baselines": baselines, "refinements": refines, "verifications": verifications}); err != nil {
 			return fail(errOut, err)
 		}
 		return 0
@@ -87,6 +91,18 @@ func runLog(args []string, out, errOut io.Writer) int {
 	for _, r := range refines {
 		fmt.Fprintf(out, "  #%d  %s  %s  %s  %s\n", r.ID, r.Agent, r.Outcome,
 			r.StartedAt.Format(time.RFC3339), r.LogPath)
+	}
+	fmt.Fprintln(out, "verifications:")
+	if len(verifications) == 0 {
+		fmt.Fprintln(out, "  (none)")
+	}
+	for _, v := range verifications {
+		sha := v.GitSHA
+		if len(sha) > 8 {
+			sha = sha[:8]
+		}
+		fmt.Fprintf(out, "  #%d  v%d  %s  %s  %s  %s\n", v.ID, v.VersionID, v.Outcome,
+			v.StartedAt.Format(time.RFC3339), sha, v.LogPath)
 	}
 	return 0
 }
@@ -156,6 +172,26 @@ func runStatus(args []string, out, errOut io.Writer) int {
 	fmt.Fprintf(display, "dirty:       %s\n", dirty)
 	fmt.Fprintf(display, "last commit: %s\n", last)
 	fmt.Fprintf(display, "applied:     %s\n", applied)
+	verified := "not configured"
+	if len(w.cfg.Verify.Commands) > 0 || w.cfg.Verify.Audit {
+		verified = "never — run `respex verify`"
+		if lastV != nil {
+			ver, err := st.LatestVerification(lastV.ID)
+			if err != nil {
+				return fail(errOut, err)
+			}
+			if ver != nil {
+				verified = ver.Outcome
+				if ver.FinishedAt != nil {
+					verified += fmt.Sprintf(" %s ago", time.Since(*ver.FinishedAt).Round(time.Second))
+				}
+				if ver.Outcome == "failed" {
+					verified += " — next apply will re-run the agent"
+				}
+			}
+		}
+	}
+	fmt.Fprintf(display, "verified:    %s\n", verified)
 	applyState := "idle"
 	lock, locked, err := tryApplyLock(filepath.Join(w.root, ".respex", "operation.lock"))
 	if err != nil {
@@ -225,7 +261,7 @@ func runStatus(args []string, out, errOut io.Writer) int {
 	}
 	fmt.Fprintf(display, "agent:       %s\n", agentLine)
 	if jsonOutput {
-		payload := map[string]any{"spec": absSpec, "dirty": dirty, "last_commit": last, "applied": applied, "apply_state": applyState, "refined": refined, "baselined": baselineState, "refine_state": refineState, "agent": agentLine}
+		payload := map[string]any{"spec": absSpec, "dirty": dirty, "last_commit": last, "applied": applied, "verified": verified, "apply_state": applyState, "refined": refined, "baselined": baselineState, "refine_state": refineState, "agent": agentLine}
 		if err := json.NewEncoder(out).Encode(payload); err != nil {
 			return fail(errOut, err)
 		}

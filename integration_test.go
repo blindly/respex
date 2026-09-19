@@ -280,3 +280,119 @@ func TestApplyInterrupt(t *testing.T) {
 		t.Fatalf("apply after interrupt: %d, %s", code, out)
 	}
 }
+
+func TestVerifyEndToEnd(t *testing.T) {
+	root := isolate(t)
+	out, code := run(t, root, "new")
+	if code != 0 {
+		t.Fatalf("new: %d, %s", code, out)
+	}
+	write(t, filepath.Join(root, "SPEC.md"), "# Demo\n\n## Intent\n\nDo the thing.\n")
+	write(t, filepath.Join(root, ".respex", "config.toml"),
+		fmt.Sprintf("[agent]\ncommand = [%q, \"{{prompt}}\"]\n[verify]\ncommands = [[%q]]\n", fakeBin, fakeBin))
+	out, code = run(t, root, "commit")
+	if code != 0 {
+		t.Fatalf("commit: %d, %s", code, out)
+	}
+	// Verification is agentless: it works before any apply.
+	out, code = run(t, root, "verify")
+	if code != 0 || !strings.Contains(out, "verifying v1: passed") {
+		t.Fatalf("verify: %d, %s", code, out)
+	}
+	out, code = run(t, root, "apply")
+	if code != 0 || !strings.Contains(out, "applied v1") || !strings.Contains(out, "verifying v1: passed") {
+		t.Fatalf("apply chains verification: %d, %s", code, out)
+	}
+	out, code = run(t, root, "apply")
+	if code != 0 || !strings.Contains(out, "nothing to do (v1 already applied)") {
+		t.Fatalf("conformed no-op: %d, %s", code, out)
+	}
+	out, code = run(t, root, "status", "--json")
+	if code != 0 || !strings.Contains(out, `"verified":"passed`) {
+		t.Fatalf("status json: %d, %s", code, out)
+	}
+	// A failing verify run blocks conformance: the next apply re-runs the
+	// agent instead of reporting "nothing to do".
+	write(t, filepath.Join(root, ".respex", "config.toml"),
+		fmt.Sprintf("[agent]\ncommand = [%q, \"{{prompt}}\"]\n[verify]\ncommands = [[%q, \"-fail\"]]\n", fakeBin, fakeBin))
+	out, code = run(t, root, "verify")
+	if code != 1 || !strings.Contains(out, "verifying v1: failed") {
+		t.Fatalf("failing verify: %d, %s", code, out)
+	}
+	out, code = run(t, root, "apply")
+	if code != 1 || !strings.Contains(out, "v1 was applied but verification failed") ||
+		!strings.Contains(out, "verification after apply failed") {
+		t.Fatalf("apply after failed verify: %d, %s", code, out)
+	}
+	// Fix the verify command; the re-apply then passes.
+	write(t, filepath.Join(root, ".respex", "config.toml"),
+		fmt.Sprintf("[agent]\ncommand = [%q, \"{{prompt}}\"]\n[verify]\ncommands = [[%q]]\n", fakeBin, fakeBin))
+	out, code = run(t, root, "apply")
+	if code != 0 || !strings.Contains(out, "verifying v1: passed") {
+		t.Fatalf("apply after fixing verify: %d, %s", code, out)
+	}
+	out, code = run(t, root, "apply")
+	if code != 0 || !strings.Contains(out, "nothing to do (v1 already applied)") {
+		t.Fatalf("final no-op: %d, %s", code, out)
+	}
+	out, code = run(t, root, "log")
+	if code != 0 || !strings.Contains(out, "verifications:") {
+		t.Fatalf("log verifications section: %d, %s", code, out)
+	}
+}
+
+func TestVerifyAuditEndToEnd(t *testing.T) {
+	root := isolate(t)
+	out, code := run(t, root, "new")
+	if code != 0 {
+		t.Fatalf("new: %d, %s", code, out)
+	}
+	write(t, filepath.Join(root, "SPEC.md"), "# Demo\n\n## Intent\n\nDo the thing.\n")
+	write(t, filepath.Join(root, ".respex", "config.toml"),
+		fmt.Sprintf("[agent]\ncommand = [%q, \"-conforms\", \"yes\", \"-marker\", %q, \"{{prompt}}\"]\n[verify]\ncommands = [[%q]]\naudit = true\n", fakeBin, filepath.Join(root, "marker"), fakeBin))
+	out, code = run(t, root, "commit")
+	if code != 0 {
+		t.Fatalf("commit: %d, %s", code, out)
+	}
+	// The audit runs with the command checks, even before any apply.
+	out, code = run(t, root, "verify")
+	if code != 0 || !strings.Contains(out, "[audit] pass") || !strings.Contains(out, "verifying v1: passed") {
+		t.Fatalf("verify with audit: %d, %s", code, out)
+	}
+	out, code = run(t, root, "apply")
+	if code != 0 || !strings.Contains(out, "applied v1") || !strings.Contains(out, "[audit] pass") {
+		t.Fatalf("apply chains audit: %d, %s", code, out)
+	}
+	out, code = run(t, root, "apply")
+	if code != 0 || !strings.Contains(out, "nothing to do (v1 already applied)") {
+		t.Fatalf("audit-backed no-op: %d, %s", code, out)
+	}
+	// A non-conforming audit fails verification: the next apply re-runs the
+	// agent instead of reporting "nothing to do".
+	write(t, filepath.Join(root, ".respex", "config.toml"),
+		fmt.Sprintf("[agent]\ncommand = [%q, \"-conforms\", \"no\", \"-marker\", %q, \"{{prompt}}\"]\n[verify]\ncommands = [[%q]]\naudit = true\n", fakeBin, filepath.Join(root, "marker"), fakeBin))
+	out, code = run(t, root, "verify")
+	if code != 1 || !strings.Contains(out, "[audit] fail") || !strings.Contains(out, "verifying v1: failed") {
+		t.Fatalf("non-conforming audit: %d, %s", code, out)
+	}
+	out, code = run(t, root, "apply")
+	if code != 1 || !strings.Contains(out, "v1 was applied but verification failed") ||
+		!strings.Contains(out, "verification after apply failed") {
+		t.Fatalf("apply after non-conforming audit: %d, %s", code, out)
+	}
+	// Conforming verdict again: the re-apply passes and conformance is restored.
+	write(t, filepath.Join(root, ".respex", "config.toml"),
+		fmt.Sprintf("[agent]\ncommand = [%q, \"-conforms\", \"yes\", \"-marker\", %q, \"{{prompt}}\"]\n[verify]\ncommands = [[%q]]\naudit = true\n", fakeBin, filepath.Join(root, "marker"), fakeBin))
+	out, code = run(t, root, "apply")
+	if code != 0 || !strings.Contains(out, "[audit] pass") {
+		t.Fatalf("apply after fixed audit: %d, %s", code, out)
+	}
+	out, code = run(t, root, "apply")
+	if code != 0 || !strings.Contains(out, "nothing to do (v1 already applied)") {
+		t.Fatalf("final no-op: %d, %s", code, out)
+	}
+	out, code = run(t, root, "status", "--json")
+	if code != 0 || !strings.Contains(out, `"verified":"passed`) {
+		t.Fatalf("status json: %d, %s", code, out)
+	}
+}

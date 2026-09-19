@@ -68,6 +68,12 @@ Output a concise critique with these sections:
 - Warnings: ambiguous wording, vague requirements, or inconsistencies.
 - Suggestions: improvements that would make the spec easier to implement.
 Do not modify any files. Do not implement anything. Only report findings.`
+
+	PromptVerify = `Audit whether this repository conforms to the design specification at {{spec_path}}.
+Read the spec fully first. If the spec links to other specification files alongside it, read them too — they are part of the spec.
+Then inspect the repository: source code, tests, configuration, build files, and documentation. Judge observable behavior, not intentions.
+Do not modify any files. This is a read-only audit.
+Finish your reply with a final line of exactly CONFORMS: yes when the repository conforms, or CONFORMS: no when it does not.`
 )
 
 const (

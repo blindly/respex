@@ -18,6 +18,7 @@ func main() {
 	bundle := flag.String("bundle", "", "write a split-spec proposal (SPEC.md + specs/*.md) into this directory")
 	fail := flag.Bool("fail", false, "exit with code 1")
 	sleep := flag.Duration("sleep", 0, "sleep before exiting")
+	conforms := flag.String("conforms", "", "print a CONFORMS verdict line with this value (yes|no)")
 	flag.Parse()
 
 	prompt, _ := io.ReadAll(os.Stdin)
@@ -57,6 +58,9 @@ func main() {
 				os.Exit(2)
 			}
 		}
+	}
+	if *conforms != "" {
+		fmt.Printf("CONFORMS: %s\n", *conforms)
 	}
 	if *fail {
 		os.Exit(1)

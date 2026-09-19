@@ -77,14 +77,18 @@ func runApply(args []string, out, errOut io.Writer) int {
 	if featurePath != "" {
 		featureLabel = path.Base(featurePath)
 	}
+	verifyConfigured := len(w.cfg.Verify.Commands) > 0 || w.cfg.Verify.Audit
 	if featurePath == "" {
-		applied, err := st.IsApplied(last.ID)
+		conformed, reason, err := st.Conformed(last.ID, verifyConfigured)
 		if err != nil {
 			return fail(errOut, err)
 		}
-		if applied {
+		if conformed {
 			fmt.Fprintf(out, "nothing to do (v%d already applied)\n", last.ID)
 			return 0
+		}
+		if reason != "no successful apply" {
+			fmt.Fprintf(out, "v%d was applied but %s — re-applying\n", last.ID, reason)
 		}
 	} else {
 		applied, err := st.IsFeatureApplied(last.ID, featurePath)
@@ -221,6 +225,12 @@ func runApply(args []string, out, errOut io.Writer) int {
 	} else {
 		fmt.Fprintf(out, "applied v%d via %s in %s — log: %s\n",
 			last.ID, tpl[0], time.Since(start).Round(time.Second), logRel)
+	}
+	if verifyConfigured && featurePath == "" {
+		run, code := runVerification(w, st, last, out, errOut)
+		if code != 0 {
+			return fail(errOut, fmt.Errorf("verification after apply failed — fix the working tree and run `respex verify`; log: %s", run.LogPath))
+		}
 	}
 	if fi, err := os.Stat(filepath.Join(w.root, ".git")); err == nil && fi.IsDir() {
 		fmt.Fprintln(out, "review the changes with `git diff`, then commit")

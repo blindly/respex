@@ -45,6 +45,7 @@ var commands = map[string]func(args []string, out, errOut io.Writer) int{
 	"doctor":     runDoctor,
 	"spec":       runSpec,
 	"check":      runCheck,
+	"verify":     runVerify,
 	"completion": runCompletion,
 }
 
@@ -64,6 +65,7 @@ Commands:
   diff       diff working spec vs last commit (or two versions)
   commit     snapshot the working spec as the approved version
   apply      agent makes the codebase match the committed spec (or one feature)
+  verify     run conformance checks against the working tree
   log        show versions and applies
   status     summarize spec and state
   restore    restore a saved refinement before-state

@@ -96,6 +96,32 @@ func runDoctor(args []string, out, errOut io.Writer) int {
 				report("PASS", "agent", path)
 			}
 		}
+		if len(w.cfg.Verify.Commands) > 0 || w.cfg.Verify.Audit {
+			verifyFailures := []string{}
+			for _, argv := range w.cfg.Verify.Commands {
+				if len(argv) == 0 {
+					verifyFailures = append(verifyFailures, "empty command")
+					continue
+				}
+				if _, err := exec.LookPath(argv[0]); err != nil {
+					verifyFailures = append(verifyFailures, err.Error())
+				}
+			}
+			detail := fmt.Sprintf("%d command(s)", len(w.cfg.Verify.Commands))
+			if w.cfg.Verify.Audit {
+				detail += " + agent audit"
+				if len(w.cfg.Agent.Command) == 0 {
+					verifyFailures = append(verifyFailures, "audit = true requires [agent] command")
+				} else if _, err := exec.LookPath(w.cfg.Agent.Command[0]); err != nil {
+					verifyFailures = append(verifyFailures, "audit agent: "+err.Error())
+				}
+			}
+			if len(verifyFailures) > 0 {
+				report("FAIL", "verify", strings.Join(verifyFailures, "; "))
+			} else {
+				report("PASS", "verify", detail)
+			}
+		}
 		if editor, err := resolveEditor(w.cfg.Editor); err != nil {
 			report("WARN", "editor", err.Error())
 		} else if path, err := exec.LookPath(editor[0]); err != nil {

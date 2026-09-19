@@ -40,6 +40,15 @@ const configTemplate = `# respex configuration
 # delivery = "argv"            # or "stdin": pipe the prompt, omit {{prompt}}
 # env = []
 
+[verify]
+# Optional conformance checks run by respex verify and after each apply.
+# Commands run in order against the working tree and stop at the first
+# failure. An empty list keeps verification off.
+# commands = [["go", "test", "./..."], ["go", "vet", "./..."]]
+# timeout = "30m"              # hard limit for the whole run; Go duration syntax
+# env = []                     # extra environment for verify commands
+# audit = false                # also let the configured agent audit conformance (read-only)
+
 [prompts]
 # Optional overrides for built-in prompts. {{spec_path}} works in all stages;
 # {{prompt}} carries the description for draft and optional intent for baseline.
