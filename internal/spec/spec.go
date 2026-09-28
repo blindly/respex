@@ -70,8 +70,30 @@ func MissingSections(content []byte) []string {
 	found := make(map[string]bool, len(required))
 	for _, line := range strings.Split(string(content), "\n") {
 		text := HeadingText(line, 2)
-		if text != "" {
-			found[text] = true
+		if text == "" {
+			text = HeadingText(line, 1)
+		}
+		if text == "" {
+			continue
+		}
+		norm := normalizeSection(text)
+		for _, section := range required {
+			if norm == normalizeSection(section) {
+				found[section] = true
+				break
+			}
+		}
+		// Headings like "Intent: why this exists" still count.
+		if norm == "" {
+			continue
+		}
+		lower := strings.ToLower(strings.TrimSpace(text))
+		for _, section := range required {
+			ls := strings.ToLower(section)
+			if strings.HasPrefix(lower, ls+":") || strings.HasPrefix(lower, ls+" -") || strings.HasPrefix(lower, ls+" –") || strings.HasPrefix(lower, ls+" —") || strings.HasPrefix(lower, ls+" (") {
+				found[section] = true
+				break
+			}
 		}
 	}
 	var missing []string
@@ -81,4 +103,19 @@ func MissingSections(content []byte) []string {
 		}
 	}
 	return missing
+}
+
+// normalizeSection lowercases a heading and strips everything except a-z so
+// "Non-Goals", "Non Goals", and "nongoals" compare equal. Trailing colons
+// like "Intent:" are ignored.
+func normalizeSection(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	s = strings.TrimRight(s, ":")
+	var b strings.Builder
+	for _, r := range s {
+		if r >= 'a' && r <= 'z' {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }

@@ -44,7 +44,12 @@ func runSpecValidate(args []string, out, errOut io.Writer) int {
 	}
 	missing := spec.MissingSections(files[0].Content)
 	if len(missing) > 0 {
-		return fail(errOut, fmt.Errorf("spec is missing required sections: %s", strings.Join(missing, ", ")))
+		return fail(errOut, fmt.Errorf("%s is missing required sections: %s", files[0].Path, strings.Join(missing, ", ")))
+	}
+	for _, f := range files[1:] {
+		if m := spec.MissingSections(f.Content); len(m) > 0 {
+			fmt.Fprintf(out, "warning: %s is missing recommended sections: %s\n", f.Path, strings.Join(m, ", "))
+		}
 	}
 	if len(files) > 1 {
 		fmt.Fprintf(out, "spec bundle is structurally valid (%d files)\n", len(files))

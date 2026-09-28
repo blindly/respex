@@ -115,5 +115,5 @@ never gates a run.
   and the agent reads the committed spec snapshot, not the working copy.
 - `Ctrl-C` interrupts the current command; the outcome is `interrupted` and
   the exit code is 1.
-- Only one apply, verify, refine, restore, or edit can run per project
+- Only one apply, baseline, refine, restore, edit, or verify can run per project
   (`.respex/operation.lock`).

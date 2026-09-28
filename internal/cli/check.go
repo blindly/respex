@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"path"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -55,6 +56,7 @@ func runCheck(args []string, out, errOut io.Writer) int {
 	if err != nil {
 		return fail(errOut, err)
 	}
+	master := paths[0]
 
 	var results []checkResult
 	var summary checkSummary
@@ -64,7 +66,7 @@ func runCheck(args []string, out, errOut io.Writer) int {
 	features := make(map[string]string) // basename(.md removed) -> path
 	for _, p := range paths {
 		configured[p] = true
-		if p != w.cfg.Spec {
+		if p != master {
 			base := path.Base(p)
 			if strings.HasSuffix(base, ".md") {
 				features[strings.TrimSuffix(base, ".md")] = p
@@ -75,7 +77,7 @@ func runCheck(args []string, out, errOut io.Writer) int {
 	// Load file contents.
 	contents := make(map[string][]byte, len(paths))
 	for _, p := range paths {
-		b, err := spec.Read(p)
+		b, err := spec.Read(filepath.Join(w.root, filepath.FromSlash(p)))
 		if err != nil {
 			addResult(&results, &summary, "fail", "readable", fmt.Sprintf("%s: %v", p, err))
 			continue
@@ -95,7 +97,7 @@ func runCheck(args []string, out, errOut io.Writer) int {
 			addResult(&results, &summary, "pass", "required-sections", fmt.Sprintf("%s contains required sections", p))
 		} else {
 			level := "fail"
-			if p != w.cfg.Spec {
+			if p != master {
 				level = "warn"
 			}
 			addResult(&results, &summary, level, "required-sections", fmt.Sprintf("%s missing sections: %s", p, strings.Join(missing, ", ")))
@@ -103,9 +105,9 @@ func runCheck(args []string, out, errOut io.Writer) int {
 	}
 
 	// Master spec checks.
-	masterContent, ok := contents[w.cfg.Spec]
+	masterContent, ok := contents[master]
 	if ok {
-		masterName := w.cfg.Spec
+		masterName := master
 
 		// Feature index links.
 		for name, fp := range features {
@@ -185,7 +187,7 @@ func runCheck(args []string, out, errOut io.Writer) int {
 	// Duplicate feature names.
 	seen := make(map[string]string)
 	for p := range contents {
-		if p == w.cfg.Spec {
+		if p == master {
 			continue
 		}
 		base := strings.TrimSuffix(path.Base(p), ".md")

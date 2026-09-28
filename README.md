@@ -8,7 +8,7 @@ For a step-by-step lifecycle guide, see [End-to-end process](https://blindly.git
 `respex` manages the lifecycle of a design spec and dispatches any agentic CLI
 (Claude Code, Gemini CLI, Codex, aider, opencode, amp, …) to act on it:
 
-    init → refine → diff → commit → apply → verify
+    init → view/edit → refine → diff → commit → apply → verify
 
 The spec is the durable source of truth; the codebase converges to it.
 
@@ -120,6 +120,7 @@ The user config provides defaults for every project. `.respex/config.toml`
 ```toml
 spec = "SPEC.md"
 spec_files = []                            # extra bundle files, e.g. specs/billing.md
+notes = ".respex/notes.md"                 # scratchpad for ideas not yet in the spec
 editor = ["code", "--wait"]                # optional editor argv
 pager = ["less", "-FRX"]                   # optional pager argv
 agent_timeout = "1h"                       # hard limit; Go duration syntax
@@ -128,6 +129,15 @@ agent_timeout = "1h"                       # hard limit; Go duration syntax
 command = ["claude", "-p", "{{prompt}}"]   # argv array — any agentic CLI
 delivery = "argv"                          # or "stdin" for long prompts
 env = []
+
+[prompts]
+# optional overrides for the built-in agent prompts. {{prompt}} carries the
+# description for draft/baseline; {{spec_path}} is the spec file or directory.
+# draft    = "..."
+# baseline = "..."
+# refine   = "..."
+# apply    = "..."
+# verify   = "..."
 
 [verify]
 commands = [["go", "test", "./..."]]       # optional conformance checks
@@ -162,9 +172,9 @@ Agent CLIs must use their non-interactive mode; for Devin CLI, use
 `command = ["devin", "--print", "{{prompt}}"]`. Success = exit code 0. Run
 output is captured under `.respex/logs/`. Interactive terminals show an elapsed
 time spinner during agent operations; use `--no-progress` or set `NO_COLOR` to
-disable it. The timeout applies to drafting, refine, and apply. Only one apply,
-refine, restore, or edit can run per project; the lock is released automatically
-when ReSpex exits.
+disable it. The timeout applies to drafting, baseline, refine, apply, and spec
+review. Only one apply, baseline, refine, restore, edit, or verify can run per
+project; the lock is released automatically when ReSpex exits.
 
 ## State
 
@@ -201,12 +211,17 @@ respex update --check              # check the latest GitHub release
 respex update                      # verify checksum and replace this binary
 respex update --version v0.1.1     # install a specific release
 respex doctor                      # diagnose config, tools, state, and locks
+respex check                       # validate the spec bundle (links, sections, quality)
 respex spec validate               # check required spec sections
+respex spec questions              # list open questions across the bundle
+respex spec review                 # agent critiques the spec without modifying files
+respex notes add "explore dark mode"  # scratchpad for ideas not yet in the spec
 respex completion powershell       # generate shell completion
 respex status --json               # machine-readable automation output
 ```
 
-`status`, `log`, `config show`, `doctor`, and `update --check` accept `--json`.
+`status`, `log`, `verify`, `check`, `config show`, `doctor`, `spec questions`,
+`spec review`, and `update --check` accept `--json`.
 
 Updates are installed only after the downloaded binary matches the release's
 `checksums.txt`. A failed download or checksum leaves the executable unchanged.

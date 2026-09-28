@@ -14,9 +14,13 @@ func (w *workspace) featureMap() (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	master := ""
+	if len(paths) > 0 {
+		master = paths[0]
+	}
 	m := make(map[string]string, len(paths)-1)
 	for _, p := range paths {
-		if p == w.cfg.Spec {
+		if p == master {
 			continue
 		}
 		base := path.Base(p)
