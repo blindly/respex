@@ -56,7 +56,8 @@ env = []
 
 [prompts]
 # Optional overrides for built-in prompts. {% raw %}{{prompt}}{% endraw %} carries the description for
-# draft/baseline; {% raw %}{{spec_path}}{% endraw %} is replaced with the spec file or directory.
+# draft/baseline. For baseline, {% raw %}{{spec_path}}{% endraw %} is a proposal directory where the
+# agent must write SPEC.md; other prompts receive a spec file or directory.
 # draft    = "..."
 # baseline = "..."
 # refine   = "..."

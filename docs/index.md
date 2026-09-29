@@ -4,7 +4,8 @@ title: ReSpex
 nav_order: 1
 ---
 
-Spec-driven agentic development: one markdown spec per repo, applied by any agent CLI.
+Spec-driven agentic development: one versioned spec per repo, stored as one file
+or a capability bundle and applied by any agent CLI.
 
 `respex` manages the lifecycle of a design spec and dispatches any agentic CLI
 (Claude Code, Gemini CLI, Codex, aider, opencode, amp, …) to act on it:
@@ -58,4 +59,4 @@ respex apply          # → "nothing to do (v1 already applied)"
 - [Verification](verification/) — opt-in conformance checks that keep applies honest.
 - [Commands](commands/) — full command reference.
 - [Workflows](workflows/) — `refine`, `baseline`, `apply`, and rollback patterns.
-- [Multi-file specs](multi-file-specs/) — splitting large specifications into a bundle.
+- [Multi-file specs](multi-file-specs/) — capability bundles and automatic baseline selection.

@@ -6,8 +6,9 @@ nav_order: 6
 
 # Multi-file specs
 
-Larger codebases can split the specification into a bundle: a master spec plus
-one spec file per durable product capability.
+Repositories with multiple durable product capabilities can represent the
+specification as a bundle: a master spec plus one file per capability. Repository
+size alone is not a reason to split.
 
 ```text
 SPEC.md
@@ -50,7 +51,7 @@ removes the proposal. The deprecated `--split` flag is a compatibility no-op.
 
 ## Validation and limits
 
-The split proposal must contain:
+A multi-file proposal must contain:
 
 - `SPEC.md` (or whatever `spec` is configured to)
 - At least one and at most 8 files matching `specs/<feature>.md`

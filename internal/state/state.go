@@ -739,7 +739,7 @@ func (s *DB) InsertBaseline(agent, outcome, beforeHash, afterHash string, before
 }
 
 // SetBaselineOutcome updates the outcome of a baseline row — used when a
-// pending split proposal is accepted or discarded.
+// pending multi-file proposal is accepted or discarded.
 func (s *DB) SetBaselineOutcome(id int64, outcome string) error {
 	_, err := s.db.Exec(`UPDATE baselines SET outcome = ? WHERE id = ?`, outcome, id)
 	if err != nil {

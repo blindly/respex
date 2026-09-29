@@ -1,6 +1,7 @@
 # ReSpex
 
-Spec-driven agentic development: one markdown spec per repo, applied by any agent CLI.
+Spec-driven agentic development: one versioned spec per repo, stored as one file
+or a capability bundle and applied by any agent CLI.
 
 Documentation: [https://blindly.github.io/respex](https://blindly.github.io/respex)
 For a step-by-step lifecycle guide, see [End-to-end process](https://blindly.github.io/respex/end-to-end/).
@@ -55,9 +56,10 @@ respex commit -m "baseline existing implementation"
 
 Use `respex baseline --merge` when the spec already contains meaningful content.
 The agent preserves established intent and records conflicts as open questions.
-Draft, baseline, and refine operate on temporary candidates; `SPEC.md` is replaced
-only after the agent succeeds. Apply always receives an immutable copy of the
-committed spec, so external edits cannot change what a running apply implements.
+Draft, baseline, and refine operate on temporary candidates. A successful
+single-file baseline replaces `SPEC.md`; a multi-file baseline remains a proposal
+until accepted. Apply always receives an immutable copy of the committed spec, so
+external edits cannot change what a running apply implements.
 
 ### Multi-file specs
 
@@ -134,7 +136,8 @@ env = []
 
 [prompts]
 # optional overrides for the built-in agent prompts. {{prompt}} carries the
-# description for draft/baseline; {{spec_path}} is the spec file or directory.
+# description for draft/baseline. For baseline, {{spec_path}} is a proposal
+# directory where the agent must write SPEC.md; other prompts receive a spec path.
 # draft    = "..."
 # baseline = "..."
 # refine   = "..."
@@ -227,6 +230,14 @@ respex status --json               # machine-readable automation output
 
 Updates are installed only after the downloaded binary matches the release's
 `checksums.txt`. A failed download or checksum leaves the executable unchanged.
+
+## Releasing
+
+`VERSION` is the repository's current release version without the `v` prefix.
+Choose the next semantic version, update `VERSION`, commit it with the release
+changes, then tag that commit with `v$(cat VERSION)` and push the tag. The release
+workflow refuses a tag that does not match `VERSION`, then tests, builds, and
+publishes the GitHub release through GoReleaser.
 
 ## Manual smoke test (per agent CLI)
 

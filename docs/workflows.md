@@ -19,31 +19,31 @@ respex apply          # already applied
 
 ## Existing project
 
-### Single-file baseline
+### Automatic baseline structure
 
 ```text
 cd existing-project
 respex init
 respex baseline --intent "what this project is meant to accomplish"
 respex diff --baseline latest
+```
+
+The agent prefers a single `SPEC.md`. When independent capability boundaries
+warrant multiple files, it instead leaves a bundle proposal; accept it after
+review:
+
+```text
+respex baseline accept
+```
+
+Then commit and apply either structure:
+
+```text
 respex commit -m "baseline existing implementation"
 respex apply
 ```
 
 Use `respex baseline --merge` if `SPEC.md` already has meaningful content.
-
-### Multi-file baseline
-
-The baseline agent chooses a bundle when the repository has independent capability
-boundaries. If it proposes multiple files, review and accept them:
-
-```text
-respex init
-respex baseline --intent "what this project is meant to accomplish"
-respex diff --baseline latest
-respex baseline accept
-respex commit -m "multi-file baseline"
-```
 
 See [Multi-file specs](multi-file-specs/) for details.
 

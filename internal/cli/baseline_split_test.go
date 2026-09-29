@@ -22,7 +22,7 @@ func TestBaselineSplitProposeAcceptCommit(t *testing.T) {
 	writeSplitConfig(t, root)
 
 	var out, errOut bytes.Buffer
-	if code := runBaseline([]string{"--split"}, &out, &errOut); code != 0 || !strings.Contains(out.String(), "split baseline proposed (3 files)") {
+	if code := runBaseline([]string{"--split"}, &out, &errOut); code != 0 || !strings.Contains(out.String(), "multi-file baseline proposed (3 files)") {
 		t.Fatalf("baseline = %d, %s | %s", code, out.String(), errOut.String())
 	}
 	if !strings.Contains(errOut.String(), "--split is deprecated") {
@@ -60,7 +60,7 @@ func TestBaselineSplitProposeAcceptCommit(t *testing.T) {
 	// Accept installs the bundle and configures spec_files.
 	out.Reset()
 	errOut.Reset()
-	if code := runBaseline([]string{"accept"}, &out, &errOut); code != 0 || !strings.Contains(out.String(), "accepted split baseline #1") {
+	if code := runBaseline([]string{"accept"}, &out, &errOut); code != 0 || !strings.Contains(out.String(), "accepted multi-file baseline #1") {
 		t.Fatalf("baseline accept = %d, %s | %s", code, out.String(), errOut.String())
 	}
 	for _, rel := range []string{"specs/alpha.md", "specs/beta.md"} {
@@ -114,7 +114,7 @@ func TestBaselineSplitDiscard(t *testing.T) {
 	}
 	out.Reset()
 	errOut.Reset()
-	if code := runBaseline([]string{"discard"}, &out, &errOut); code != 0 || !strings.Contains(out.String(), "discarded split baseline proposal #1") {
+	if code := runBaseline([]string{"discard"}, &out, &errOut); code != 0 || !strings.Contains(out.String(), "discarded multi-file baseline proposal #1") {
 		t.Fatalf("baseline discard = %d, %s | %s", code, out.String(), errOut.String())
 	}
 	if entries, err := os.ReadDir(filepath.Join(root, ".respex", "proposals")); err != nil || len(entries) != 0 {
@@ -150,7 +150,7 @@ func TestBaselineAcceptRefusesChangedSpec(t *testing.T) {
 func TestBaselineAcceptWithoutProposal(t *testing.T) {
 	setupProject(t)
 	var out, errOut bytes.Buffer
-	if code := runBaseline([]string{"accept"}, &out, &errOut); code != 1 || !strings.Contains(errOut.String(), "no pending split baseline proposal") {
+	if code := runBaseline([]string{"accept"}, &out, &errOut); code != 1 || !strings.Contains(errOut.String(), "no pending multi-file baseline proposal") {
 		t.Fatalf("accept without proposal = %d, %s | %s", code, out.String(), errOut.String())
 	}
 }

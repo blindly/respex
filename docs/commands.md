@@ -91,7 +91,7 @@ Show versions, applies, baselines, refinements, and verifications.
 ### `respex status [--json]`
 Summarize the spec, dirty state, apply state, latest verification result,
 refinement/baseline history, and agent configuration. Also reports pending
-split baseline proposals.
+multi-file baseline proposals.
 
 ### `respex restore <--refine|--baseline> <id|latest> --before`
 Restore the working spec to the before-state of a refinement or baseline.

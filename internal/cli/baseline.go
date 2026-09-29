@@ -25,10 +25,10 @@ import (
 	"github.com/blindly/respex/internal/ui"
 )
 
-// splitProposal is the JSON payload stored in baselines.proposal for
-// `baseline --split` rows: the proposed bundle plus the live content of every
-// file it would replace, so review and accept stay self-contained.
-type splitProposal struct {
+// multiFileProposal is the JSON payload stored in baselines.proposal for a
+// proposed bundle plus the live content of every file it would replace, so
+// review and accept stay self-contained.
+type multiFileProposal struct {
 	Dir    string      `json:"dir"`
 	Before []spec.File `json:"before"`
 	After  []spec.File `json:"after"`
@@ -123,8 +123,8 @@ func pendingProposal(st *state.DB) (*state.Baseline, error) {
 	return latest, nil
 }
 
-func decodeProposal(b *state.Baseline) (*splitProposal, error) {
-	var p splitProposal
+func decodeProposal(b *state.Baseline) (*multiFileProposal, error) {
+	var p multiFileProposal
 	if err := json.Unmarshal(b.Proposal, &p); err != nil || len(p.After) == 0 {
 		return nil, fmt.Errorf("corrupt proposal in baseline #%d", b.ID)
 	}
@@ -188,7 +188,7 @@ func runBaselineAccept(w *workspace, st *state.DB, out, errOut io.Writer) int {
 		return fail(errOut, err)
 	}
 	if b == nil {
-		return fail(errOut, errors.New("no pending split baseline proposal"))
+		return fail(errOut, errors.New("no pending multi-file baseline proposal"))
 	}
 	p, err := decodeProposal(b)
 	if err != nil {
@@ -238,7 +238,7 @@ func runBaselineAccept(w *workspace, st *state.DB, out, errOut io.Writer) int {
 	}
 	removeProposalDir(w.root, p.Dir)
 	warnMissingSections(out, p.After[0].Content)
-	fmt.Fprintf(out, "accepted split baseline #%d (%d files)\n", b.ID, len(p.After))
+	fmt.Fprintf(out, "accepted multi-file baseline #%d (%d files)\n", b.ID, len(p.After))
 	for _, f := range p.After {
 		fmt.Fprintf(out, "  %s\n", f.Path)
 	}
@@ -252,7 +252,7 @@ func runBaselineDiscard(w *workspace, st *state.DB, out, errOut io.Writer) int {
 		return fail(errOut, err)
 	}
 	if b == nil {
-		return fail(errOut, errors.New("no pending split baseline proposal"))
+		return fail(errOut, errors.New("no pending multi-file baseline proposal"))
 	}
 	if p, err := decodeProposal(b); err == nil {
 		removeProposalDir(w.root, p.Dir)
@@ -260,7 +260,7 @@ func runBaselineDiscard(w *workspace, st *state.DB, out, errOut io.Writer) int {
 	if err := st.SetBaselineOutcome(b.ID, "discarded"); err != nil {
 		return fail(errOut, err)
 	}
-	fmt.Fprintf(out, "discarded split baseline proposal #%d\n", b.ID)
+	fmt.Fprintf(out, "discarded multi-file baseline proposal #%d\n", b.ID)
 	return 0
 }
 
@@ -383,14 +383,14 @@ func runBaselineProposal(w *workspace, st *state.DB, intent string, merge, noPro
 	if err != nil {
 		return fail(errOut, err)
 	}
-	encoded, err := json.Marshal(splitProposal{Dir: proposalRel, Before: propBefore, After: after})
+	encoded, err := json.Marshal(multiFileProposal{Dir: proposalRel, Before: propBefore, After: after})
 	if err != nil {
 		return fail(errOut, err)
 	}
 	if err := record("proposed", after[0].Content, encoded, spec.HashFiles(after)); err != nil {
 		return fail(errOut, err)
 	}
-	fmt.Fprintf(out, "split baseline proposed (%d files) via %s — log: %s\n", len(after), name, logRel)
+	fmt.Fprintf(out, "multi-file baseline proposed (%d files) via %s — log: %s\n", len(after), name, logRel)
 	fmt.Fprintln(out, "review with `respex diff --baseline latest`, then `respex baseline accept` or `respex baseline discard`")
 	return 0
 }
@@ -436,7 +436,7 @@ func runBaseline(args []string, out, errOut io.Writer) int {
 		return fail(errOut, err)
 	}
 	if pending != nil {
-		return fail(errOut, errors.New("a split baseline proposal is pending — run `respex baseline accept` or `respex baseline discard`"))
+		return fail(errOut, errors.New("a multi-file baseline proposal is pending — run `respex baseline accept` or `respex baseline discard`"))
 	}
 	before, err := spec.Read(w.specPath())
 	if err != nil {
