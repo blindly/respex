@@ -173,13 +173,13 @@ If `SPEC.md` already has meaningful content, add `--merge`:
 respex baseline --merge --intent "..."
 ```
 
-For larger codebases, use `--split` to propose a multi-file spec bundle:
+The agent prefers one spec but can propose a multi-file bundle when the repository
+has durable capabilities with independent requirement boundaries. When it does:
 
 ```text
-respex baseline --split --intent "..."
 respex diff --baseline latest
 respex baseline accept
-respex commit -m "split baseline"
+respex commit -m "multi-file baseline"
 ```
 
 ### 2. Refine or edit, then apply

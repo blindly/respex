@@ -23,7 +23,10 @@ func TestBaselineSplitProposeAcceptCommit(t *testing.T) {
 
 	var out, errOut bytes.Buffer
 	if code := runBaseline([]string{"--split"}, &out, &errOut); code != 0 || !strings.Contains(out.String(), "split baseline proposed (3 files)") {
-		t.Fatalf("baseline --split = %d, %s | %s", code, out.String(), errOut.String())
+		t.Fatalf("baseline = %d, %s | %s", code, out.String(), errOut.String())
+	}
+	if !strings.Contains(errOut.String(), "--split is deprecated") {
+		t.Fatalf("missing deprecation warning: %s", errOut.String())
 	}
 	if !strings.Contains(out.String(), "ignoring unexpected proposal file notes/internal.txt") {
 		t.Fatalf("expected ignored-file warning, out = %s", out.String())
@@ -106,7 +109,7 @@ func TestBaselineSplitDiscard(t *testing.T) {
 	writeSpec(t, root, spec.Skeleton)
 	writeSplitConfig(t, root)
 	var out, errOut bytes.Buffer
-	if code := runBaseline([]string{"--split"}, &out, &errOut); code != 0 {
+	if code := runBaseline(nil, &out, &errOut); code != 0 {
 		t.Fatalf("baseline --split = %d, %s", code, errOut.String())
 	}
 	out.Reset()
@@ -120,7 +123,7 @@ func TestBaselineSplitDiscard(t *testing.T) {
 	// A fresh proposal can be generated after discarding.
 	out.Reset()
 	errOut.Reset()
-	if code := runBaseline([]string{"--split"}, &out, &errOut); code != 0 || !strings.Contains(out.String(), "proposed") {
+	if code := runBaseline(nil, &out, &errOut); code != 0 || !strings.Contains(out.String(), "proposed") {
 		t.Fatalf("re-split after discard = %d, %s | %s", code, out.String(), errOut.String())
 	}
 }
@@ -130,7 +133,7 @@ func TestBaselineAcceptRefusesChangedSpec(t *testing.T) {
 	writeSpec(t, root, spec.Skeleton)
 	writeSplitConfig(t, root)
 	var out, errOut bytes.Buffer
-	if code := runBaseline([]string{"--split"}, &out, &errOut); code != 0 {
+	if code := runBaseline(nil, &out, &errOut); code != 0 {
 		t.Fatalf("baseline --split = %d, %s", code, errOut.String())
 	}
 	writeSpec(t, root, "# user edits\n")
@@ -157,7 +160,7 @@ func TestApplyBundleSnapshot(t *testing.T) {
 	writeSpec(t, root, spec.Skeleton)
 	writeSplitConfig(t, root)
 	var out, errOut bytes.Buffer
-	if code := runBaseline([]string{"--split"}, &out, &errOut); code != 0 {
+	if code := runBaseline(nil, &out, &errOut); code != 0 {
 		t.Fatalf("baseline --split = %d, %s", code, errOut.String())
 	}
 	if code := runBaseline([]string{"accept"}, &out, &errOut); code != 0 {

@@ -47,8 +47,8 @@ type Baseline struct {
 	AfterHash     string
 	BeforeContent []byte
 	AfterContent  []byte
-	// Proposal holds a JSON-encoded split proposal (before/after file maps)
-	// for `baseline --split` rows; empty for ordinary baselines.
+	// Proposal holds a JSON-encoded multi-file baseline proposal (before/after
+	// file maps); empty for single-file baselines.
 	Proposal []byte
 	LogPath  string
 }

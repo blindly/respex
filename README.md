@@ -61,9 +61,9 @@ committed spec, so external edits cannot change what a running apply implements.
 
 ### Multi-file specs
 
-Larger codebases can split the spec into a bundle: `SPEC.md` stays the master
-document (intent, scope, invariants, and a feature index) while durable product
-capabilities live under `specs/`:
+When a repository has multiple durable product capabilities with independent
+requirement boundaries, the baseline agent can choose a bundle: `SPEC.md` stays
+the master document while capability specs live under `specs/`:
 
 ```text
 SPEC.md
@@ -71,16 +71,18 @@ specs/authentication.md
 specs/billing.md
 ```
 
-`respex baseline --split` asks the agent to propose this layout inside
-`.respex/proposals/` without touching the live spec. Review the whole proposal,
-then accept or discard it:
+`respex baseline` prefers one file and chooses a bundle only when those boundaries
+warrant it. A multi-file result is proposed inside `.respex/proposals/` without
+touching the live spec. Review the whole proposal, then accept or discard it:
 
 ```text
-respex baseline --split --intent "what this project is meant to accomplish"
-respex diff --baseline latest        # per-file diff of the proposal
+respex baseline --intent "what this project is meant to accomplish"
+respex diff --baseline latest        # per-file diff when a bundle was proposed
 respex baseline accept               # install files + configure spec_files
 respex baseline discard              # drop the proposal
 ```
+
+`--split` is deprecated and retained as a compatibility no-op.
 
 Accept refuses to run if any target file changed since the proposal was
 generated, then writes `spec_files` into `.respex/config.toml`:

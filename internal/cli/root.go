@@ -60,7 +60,7 @@ Commands:
   new        compatibility alias for init
   view       view the working or historical spec (optionally by feature)
   edit       open the spec or a feature spec in the configured editor
-  baseline   derive a spec from an existing repository (--split for multi-file)
+  baseline   derive a single or multi-file spec from an existing repository
   refine     agent critiques and rewrites the spec or a feature spec
   diff       diff working spec vs last commit (or two versions)
   commit     snapshot the working spec as the approved version

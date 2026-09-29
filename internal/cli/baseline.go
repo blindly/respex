@@ -85,9 +85,6 @@ func collectProposal(dir, master string) (after []spec.File, ignored []string, e
 	if masterFile == nil {
 		return nil, ignored, fmt.Errorf("the agent did not write %s inside the proposal directory", master)
 	}
-	if len(features) == 0 {
-		return nil, ignored, errors.New("the agent did not write any specs/<feature>.md files")
-	}
 	if len(features) > maxSplitFeatures {
 		return nil, ignored, fmt.Errorf("the proposal contains %d feature files (maximum %d)", len(features), maxSplitFeatures)
 	}
@@ -267,7 +264,7 @@ func runBaselineDiscard(w *workspace, st *state.DB, out, errOut io.Writer) int {
 	return 0
 }
 
-func runBaselineSplit(w *workspace, st *state.DB, intent string, merge, noProgress bool, before []byte, out, errOut io.Writer) int {
+func runBaselineProposal(w *workspace, st *state.DB, intent string, merge, noProgress bool, before []byte, out, errOut io.Writer) int {
 	if len(w.cfg.SpecFiles) > 0 {
 		return fail(errOut, errors.New("spec_files is already configured — remove it from .respex/config.toml to re-propose a split"))
 	}
@@ -312,14 +309,14 @@ func runBaselineSplit(w *workspace, st *state.DB, intent string, merge, noProgre
 		_, err := st.InsertBaseline(name, outcome, beforeHash, afterHash, before, after, proposal, logRel, started, time.Now())
 		return err
 	}
-	tmpl := agent.PromptBaselineSplit
+	tmpl := agent.PromptBaseline
 	if w.cfg.Prompts.Baseline != "" {
 		tmpl = w.cfg.Prompts.Baseline
 	}
 	if merge {
 		tmpl += "\n\nMerge findings with the existing specification's content. Preserve established user intent and explicitly documented requirements unless they directly contradict observed behavior; record conflicts in Open Questions."
 	}
-	label := fmt.Sprintf("proposing split baseline via %s", name)
+	label := fmt.Sprintf("baselining repository via %s", name)
 	progressEnabled := ui.IsTTY(out) && !noProgress && os.Getenv("NO_COLOR") == ""
 	if !progressEnabled {
 		fmt.Fprintf(out, "%s; output: %s\n", label, logRel)
@@ -359,6 +356,29 @@ func runBaselineSplit(w *workspace, st *state.DB, intent string, merge, noProgre
 	for _, ig := range ignored {
 		fmt.Fprintf(out, "warning: ignoring unexpected proposal file %s\n", ig)
 	}
+	if len(after) == 1 {
+		live, err := os.ReadFile(w.specPath())
+		if err != nil || !bytes.Equal(live, before) {
+			return fail(errOut, errors.New("spec changed while baseline was running; generated candidate was not installed"))
+		}
+		if err := writeFileAtomic(w.specPath(), after[0].Content); err != nil {
+			return fail(errOut, fmt.Errorf("install baseline spec: %w", err))
+		}
+		removeProposalDir(w.root, proposalRel)
+		warnMissingSections(out, after[0].Content)
+		outcome := "generated"
+		if spec.Hash(before) == spec.Hash(after[0].Content) {
+			outcome = "unchanged"
+		} else if merge {
+			outcome = "merged"
+		}
+		if err := record(outcome, after[0].Content, nil, spec.Hash(after[0].Content)); err != nil {
+			return fail(errOut, err)
+		}
+		fmt.Fprintf(out, "baseline %s as a single spec via %s (%s… → %s…) — log: %s\n", outcome, name, spec.Hash(before)[:8], spec.Hash(after[0].Content)[:8], logRel)
+		fmt.Fprintln(out, "review with `respex diff --baseline latest`, then commit")
+		return 0
+	}
 	propBefore, err := proposalBefore(w.root, after)
 	if err != nil {
 		return fail(errOut, err)
@@ -384,7 +404,7 @@ func runBaseline(args []string, out, errOut io.Writer) int {
 	if err := fs.Parse(args); err != nil {
 		return fail(errOut, err)
 	}
-	usage := "respex baseline [--split] [--intent text] [--merge] [--no-progress] | respex baseline <accept|discard>"
+	usage := "respex baseline [--intent text] [--merge] [--no-progress] | respex baseline <accept|discard>"
 	if fs.NArg() > 1 || (fs.NArg() == 1 && fs.Arg(0) != "accept" && fs.Arg(0) != "discard") {
 		return fail(errOut, fmt.Errorf("unexpected argument %q — usage: %s", fs.Arg(0), usage))
 	}
@@ -423,104 +443,10 @@ func runBaseline(args []string, out, errOut io.Writer) int {
 		return fail(errOut, err)
 	}
 	if spec.Hash(before) != spec.Hash([]byte(spec.Skeleton)) && !*merge {
-		hint := "`respex baseline --merge`"
-		if *split {
-			hint = "`respex baseline --split --merge`"
-		}
-		return fail(errOut, fmt.Errorf("the spec contains meaningful content — review it and rerun with %s", hint))
+		return fail(errOut, errors.New("the spec contains meaningful content — review it and rerun with `respex baseline --merge`"))
 	}
 	if *split {
-		return runBaselineSplit(w, st, *intent, *merge, *noProgress, before, out, errOut)
+		fmt.Fprintln(errOut, "warning: --split is deprecated; the agent now chooses the baseline structure")
 	}
-	a, name, err := w.adapter()
-	if err != nil {
-		return fail(errOut, err)
-	}
-	candidatePath, cleanupCandidate, err := createSpecCandidate(w.root, before)
-	if err != nil {
-		return fail(errOut, err)
-	}
-	defer cleanupCandidate()
-	logsDir := filepath.Join(w.root, ".respex", "logs")
-	if err := os.MkdirAll(logsDir, 0o755); err != nil {
-		return fail(errOut, err)
-	}
-	f, err := os.CreateTemp(logsDir, time.Now().UTC().Format("20060102T150405Z")+"-baseline-*.log")
-	if err != nil {
-		return fail(errOut, err)
-	}
-	defer f.Close()
-	logPath := f.Name()
-	logRel := filepath.Join(".respex", "logs", filepath.Base(logPath))
-	started := time.Now()
-	record := func(outcome string, after []byte) error {
-		if after == nil {
-			after = []byte{}
-		}
-		afterHash := ""
-		if len(after) > 0 {
-			afterHash = spec.Hash(after)
-		}
-		_, err := st.InsertBaseline(name, outcome, spec.Hash(before), afterHash, before, after, nil, logRel, started, time.Now())
-		return err
-	}
-	tmpl := agent.PromptBaseline
-	if w.cfg.Prompts.Baseline != "" {
-		tmpl = w.cfg.Prompts.Baseline
-	}
-	if *merge {
-		tmpl += "\n\nMerge findings into the existing specification. Preserve established user intent and explicitly documented requirements unless they directly contradict observed behavior; record conflicts in Open Questions."
-	}
-	absSpec := candidatePath
-	label := fmt.Sprintf("baselining repository via %s", name)
-	progressEnabled := ui.IsTTY(out) && !*noProgress && os.Getenv("NO_COLOR") == ""
-	if !progressEnabled {
-		fmt.Fprintf(out, "%s; output: %s\n", label, logRel)
-	}
-	progress := ui.StartProgress(out, label, progressEnabled)
-	signalCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-	defer stop()
-	ctx, cancel := context.WithTimeout(signalCtx, w.cfg.AgentTimeout)
-	defer cancel()
-	code, err := a.Execute(ctx, agent.Expand(tmpl, *intent, absSpec), absSpec, f)
-	progress.Stop()
-	if err != nil {
-		outcome := "failed"
-		if errors.Is(err, context.DeadlineExceeded) {
-			outcome = "timed_out"
-		} else if errors.Is(err, context.Canceled) {
-			outcome = "interrupted"
-		}
-		if rerr := record(outcome, before); rerr != nil {
-			return fail(errOut, rerr)
-		}
-		return fail(errOut, fmt.Errorf("baseline %s — log: %s", outcome, logPath))
-	}
-	if code != 0 {
-		if err := record("failed", before); err != nil {
-			return fail(errOut, err)
-		}
-		return fail(errOut, fmt.Errorf("baseline failed (exit %d) — log: %s", code, logPath))
-	}
-	after, err := installSpecCandidate(w.specPath(), candidatePath, before)
-	if err != nil {
-		candidate, _ := os.ReadFile(candidatePath)
-		if rerr := record("failed", candidate); rerr != nil {
-			return fail(errOut, rerr)
-		}
-		return fail(errOut, fmt.Errorf("install baseline spec — log: %s: %w", logPath, err))
-	}
-	warnMissingSections(out, after)
-	outcome := "generated"
-	if spec.Hash(before) == spec.Hash(after) {
-		outcome = "unchanged"
-	} else if *merge {
-		outcome = "merged"
-	}
-	if err := record(outcome, after); err != nil {
-		return fail(errOut, err)
-	}
-	fmt.Fprintf(out, "baseline %s via %s (%s… → %s…) — log: %s\n", outcome, name, spec.Hash(before)[:8], spec.Hash(after)[:8], logRel)
-	fmt.Fprintln(out, "review with `respex diff --baseline latest`, then commit")
-	return 0
+	return runBaselineProposal(w, st, *intent, *merge, *noProgress, before, out, errOut)
 }

@@ -31,21 +31,22 @@ spec_files = ["specs/authentication.md", "specs/billing.md", "specs/reporting.md
 Project-level `spec_files` overrides the user-level setting. Once configured,
 `respex` treats the whole bundle as a single specification version.
 
-## Generate a split baseline
+## Generate a multi-file baseline
 
 ```text
 respex init
-respex baseline --split --intent "what this project is meant to accomplish"
+respex baseline --intent "what this project is meant to accomplish"
 respex diff --baseline latest
 respex baseline accept
-respex commit -m "split baseline"
+respex commit -m "multi-file baseline"
 ```
 
-`baseline --split` asks the agent to write a proposed bundle inside
-`.respex/proposals/baseline-*/`. The live repository is unchanged while the
+`baseline` prefers one specification and chooses multiple files only for durable
+product capabilities with independent requirement boundaries. A bundle is written
+inside `.respex/proposals/baseline-*/`; the live repository is unchanged while the
 proposal is pending. `baseline accept` installs the files, updates
 `.respex/config.toml`, and records the row as accepted. `baseline discard`
-removes the proposal.
+removes the proposal. The deprecated `--split` flag is a compatibility no-op.
 
 ## Validation and limits
 

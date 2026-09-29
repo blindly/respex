@@ -12,19 +12,11 @@ Write concrete, testable requirements. Do not create or modify any other files.
 
 Idea: {{prompt}}`
 
-	PromptBaseline = `Derive a baseline design specification for the existing repository and write it at {{spec_path}}.
+	PromptBaseline = `Derive a baseline design specification for the existing repository inside the directory {{spec_path}}.
 Inspect the repository thoroughly, including documentation, source code, tests, configuration, build files, public interfaces, and platform assumptions.
-Describe observable current behavior as concrete requirements. Do not invent intent or non-goals that cannot be established from evidence; put uncertainty in Open Questions.
-Use exactly these sections: Intent, Scope, Non-Goals, Requirements, Open Questions.
-Do not create or modify any other files.
-
-Additional intent supplied by the user: {{prompt}}`
-
-	PromptBaselineSplit = `Derive a baseline design specification for the existing repository and write it as multiple Markdown files inside the directory {{spec_path}}.
-Inspect the repository thoroughly, including documentation, source code, tests, configuration, build files, public interfaces, and platform assumptions.
-Write {{spec_path}}/SPEC.md as the master specification with exactly these sections: Intent, Scope, Non-Goals, Requirements, Features, Open Questions. The Features section must link to each feature file with a relative Markdown link.
-Write each durable product capability as {{spec_path}}/specs/<feature>.md using a lowercase hyphenated name, with these sections: Intent, Scope, Non-Goals, Requirements, Dependencies, Open Questions.
-Organize around stable product capabilities, not source directories. Create at most 8 feature files.
+Decide whether the project is best represented by one specification or by a master specification plus feature specifications. Prefer one file unless the repository has multiple durable product capabilities with independent requirement boundaries; do not split by source directory or merely because the repository is large.
+Always write {{spec_path}}/SPEC.md. For a single-file specification, use exactly these sections: Intent, Scope, Non-Goals, Requirements, Open Questions.
+When multiple files are warranted, give SPEC.md exactly these sections: Intent, Scope, Non-Goals, Requirements, Features, Open Questions, with relative Markdown links in Features. Write each durable capability as {{spec_path}}/specs/<feature>.md using a lowercase hyphenated name and these sections: Intent, Scope, Non-Goals, Requirements, Dependencies, Open Questions. Create at most 8 feature files.
 Describe observable current behavior as concrete requirements. Do not invent intent or non-goals that cannot be established from evidence; put uncertainty in Open Questions.
 Do not create or modify any files outside {{spec_path}}.
 

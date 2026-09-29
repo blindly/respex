@@ -113,16 +113,17 @@ Use `respex refine --notes` to let the agent read them as context.
 
 ## Baseline
 
-### `respex baseline [--split] [--intent text] [--merge] [--no-progress]`
-Derive an initial spec from an existing repository.
+### `respex baseline [--intent text] [--merge] [--no-progress]`
+Derive an initial spec from an existing repository. The agent chooses one spec by
+default or a master spec plus feature specs when independent capability boundaries
+warrant a bundle. `--split` is accepted as a deprecated compatibility no-op.
 
 ```text
 respex baseline --intent "purpose of this project"
-respex baseline --split --intent "purpose of this project"
 respex baseline --merge
 ```
 
-After `--split`:
+When the agent proposes multiple files:
 
 ```text
 respex diff --baseline latest

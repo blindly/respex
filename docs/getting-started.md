@@ -42,8 +42,8 @@ respex commit -m "baseline existing implementation"
 Use `respex baseline --merge` when `SPEC.md` already contains meaningful
 content.
 
-Use `respex baseline --split` for large codebases that need a multi-file spec
-bundle. See [Multi-file specs](multi-file-specs/).
+The baseline agent prefers one spec and chooses a multi-file bundle only when the
+repository has independent capability boundaries. See [Multi-file specs](multi-file-specs/).
 
 ## Edit and refine
 

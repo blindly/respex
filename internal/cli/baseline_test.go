@@ -15,7 +15,7 @@ import (
 func TestBaselineGeneratesAndDiffsSpec(t *testing.T) {
 	root := setupProject(t)
 	writeSpec(t, root, spec.Skeleton)
-	writeConfig(t, root, fmt.Sprintf("[agent]\ncommand = [%q, \"-write\", \"{{spec_path}}\", \"-content\", \"# Existing project\\n\", \"{{prompt}}\"]\n", fakeBin))
+	writeConfig(t, root, fmt.Sprintf("[agent]\ncommand = [%q, \"-write\", \"{{spec_path}}/SPEC.md\", \"-content\", \"# Existing project\\n\", \"{{prompt}}\"]\n", fakeBin))
 	var out, errOut bytes.Buffer
 	if code := runBaseline([]string{"--intent", "preserve compatibility"}, &out, &errOut); code != 0 || !strings.Contains(out.String(), "baseline generated") {
 		t.Fatalf("baseline = %d, %s | %s", code, out.String(), errOut.String())
@@ -50,7 +50,7 @@ func TestBaselineGeneratesAndDiffsSpec(t *testing.T) {
 func TestBaselineRequiresMergeForMeaningfulSpec(t *testing.T) {
 	root := setupProject(t)
 	writeSpec(t, root, "# Existing intent\n")
-	writeConfig(t, root, fmt.Sprintf("[agent]\ncommand = [%q, \"{{prompt}}\"]\n", fakeBin))
+	writeConfig(t, root, fmt.Sprintf("[agent]\ncommand = [%q, \"-write\", \"{{spec_path}}/SPEC.md\", \"-content\", \"# Existing intent\\n\", \"{{prompt}}\"]\n", fakeBin))
 	var out, errOut bytes.Buffer
 	if code := runBaseline(nil, &out, &errOut); code != 1 || !strings.Contains(errOut.String(), "--merge") {
 		t.Fatalf("baseline without merge = %d, %s | %s", code, out.String(), errOut.String())

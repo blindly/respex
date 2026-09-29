@@ -130,9 +130,9 @@ func runNew(args []string, out, errOut io.Writer) int {
 			fmt.Fprintln(out, "no agent configured — set [agent] command in .respex/config.toml, then run `respex refine`")
 		} else if existingProject {
 			if len(cfg.Agent.Command) > 0 {
-				fmt.Fprintln(out, "existing repository detected — run `respex baseline` (or `--split` for a multi-file spec) to derive the initial spec")
+				fmt.Fprintln(out, "existing repository detected — run `respex baseline` to derive the initial spec")
 			} else {
-				fmt.Fprintln(out, "existing repository detected — configure an agent, then run `respex baseline` (or `--split` for a multi-file spec)")
+				fmt.Fprintln(out, "existing repository detected — configure an agent, then run `respex baseline`")
 			}
 		} else {
 			fmt.Fprintln(out, "edit the spec, then run `respex commit` before `respex apply`")

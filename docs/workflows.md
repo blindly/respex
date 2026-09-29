@@ -34,11 +34,12 @@ Use `respex baseline --merge` if `SPEC.md` already has meaningful content.
 
 ### Multi-file baseline
 
-For larger codebases, ask the agent to propose a spec bundle:
+The baseline agent chooses a bundle when the repository has independent capability
+boundaries. If it proposes multiple files, review and accept them:
 
 ```text
 respex init
-respex baseline --split --intent "what this project is meant to accomplish"
+respex baseline --intent "what this project is meant to accomplish"
 respex diff --baseline latest
 respex baseline accept
 respex commit -m "multi-file baseline"
