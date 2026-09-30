@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -14,6 +15,31 @@ import (
 
 	"github.com/blindly/respex/internal/agent"
 )
+
+// agentOutputHint summarizes the tail of an agent probe's output for a
+// one-line doctor report, so a failed check shows the agent's own error instead
+// of only an exit code.
+func agentOutputHint(raw string) string {
+	var lines []string
+	for _, line := range strings.Split(raw, "\n") {
+		if s := strings.TrimSpace(line); s != "" {
+			lines = append(lines, s)
+		}
+	}
+	if len(lines) == 0 {
+		return ""
+	}
+	const maxLines = 2
+	if len(lines) > maxLines {
+		lines = lines[len(lines)-maxLines:]
+	}
+	hint := strings.Join(lines, " | ")
+	const maxLen = 300
+	if len(hint) > maxLen {
+		hint = hint[:maxLen] + "…"
+	}
+	return " — " + hint
+}
 
 func runDoctor(args []string, out, errOut io.Writer) int {
 	fs := newFlagSet("doctor", errOut)
@@ -70,25 +96,31 @@ func runDoctor(args []string, out, errOut io.Writer) int {
 				report("FAIL", "agent", buildErr.Error())
 			} else if *agentCheck {
 				a := agent.Adapter{Command: w.cfg.Agent.Command, Delivery: delivery, Env: w.cfg.Agent.Env, Dir: w.root}
-				tmpDir := filepath.Join(w.root, ".respex", "tmp")
-				if err := os.MkdirAll(tmpDir, 0o755); err != nil {
-					report("FAIL", "agent-check", fmt.Sprintf("create tmp dir: %v", err))
+				logsDir := filepath.Join(w.root, ".respex", "logs")
+				if err := os.MkdirAll(logsDir, 0o755); err != nil {
+					report("FAIL", "agent-check", fmt.Sprintf("create log dir: %v", err))
 				} else {
-					tmp, err := os.CreateTemp(tmpDir, "doctor-agent-check-*.log")
+					logPath := filepath.Join(logsDir, time.Now().UTC().Format("20060102T150405Z")+"-doctor-agent-check.log")
+					tmp, err := os.Create(logPath)
 					if err != nil {
-						report("FAIL", "agent-check", fmt.Sprintf("create temp log: %v", err))
+						report("FAIL", "agent-check", fmt.Sprintf("create log: %v", err))
 					} else {
-						defer tmp.Close()
-						defer os.Remove(tmp.Name())
+						var captured bytes.Buffer
 						ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-						code, err := a.Execute(ctx, "Reply with only the word OK to confirm the agent CLI is reachable.", filepath.Join(w.root, "SPEC.md"), tmp)
+						code, runErr := a.Execute(ctx, "Reply with only the word OK to confirm the agent CLI is reachable.", w.absSpecPath(), io.MultiWriter(tmp, &captured))
 						cancel()
-						if err != nil {
-							report("FAIL", "agent-check", err.Error())
-						} else if code != 0 {
-							report("FAIL", "agent-check", fmt.Sprintf("exit %d", code))
-						} else {
-							report("PASS", "agent-check", "agent responded to test prompt")
+						tmp.Close()
+						rel := logPath
+						if r, relErr := filepath.Rel(w.root, logPath); relErr == nil {
+							rel = filepath.ToSlash(r)
+						}
+						switch {
+						case runErr != nil:
+							report("FAIL", "agent-check", fmt.Sprintf("%v — log: %s", runErr, rel))
+						case code != 0:
+							report("FAIL", "agent-check", fmt.Sprintf("exit %d — log: %s%s", code, rel, agentOutputHint(captured.String())))
+						default:
+							report("PASS", "agent-check", "agent responded to test prompt; log: "+rel)
 						}
 					}
 				}
